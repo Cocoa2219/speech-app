@@ -121,8 +121,11 @@ the default, because the fixtures were written for it.
 - **Deferred**: custom personas, history, extra preset personas, live/streaming feedback, PDF slide import,
   body-language scoring.
 
-Model: `gemini-3.8-flash` for every stage (stable, audio/video input, structured outputs), set in
-`shared/src/commonMain/kotlin/dev/cocoa/speech/GeminiModels.kt`. The developer chose to skip the Day 1 benchmark; the
+Model: one Flash model for every stage (audio/video input, structured outputs), set in
+`shared/src/commonMain/kotlin/dev/cocoa/speech/GeminiModels.kt`. The intended model is `gemini-3.8-flash`, but it is
+**temporarily `gemini-3.6-flash`**: on 2026-10-29, 3.8 Flash took ~48 s for a one-line prompt on our key, while 3.6
+Flash answered the same JSON-schema request in ~3 s. Re-time 3.8 Flash before demo day and switch back if it is fast.
+`GeminiClient` uses a 120 s request timeout; a timeout is a retryable stage failure. The developer chose to skip the Day 1 benchmark; the
 transcription notes below are still unverified, so check them while building Layer 1.
 
 Checkpoints: (skipped) Day 1 benchmark (Korean 60 s and 3 min clips: transcription speed, timestamp precision, fillers, upload
