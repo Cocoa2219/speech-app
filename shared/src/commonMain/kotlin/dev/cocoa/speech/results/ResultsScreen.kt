@@ -52,6 +52,7 @@ import speech_app.shared.generated.resources.results_mock_badge
 import speech_app.shared.generated.resources.results_no_fixes
 import speech_app.shared.generated.resources.results_no_questions
 import speech_app.shared.generated.resources.results_no_recording
+import speech_app.shared.generated.resources.results_no_replay
 import speech_app.shared.generated.resources.results_retry
 import speech_app.shared.generated.resources.results_tab_fixes
 import speech_app.shared.generated.resources.results_tab_questions
@@ -61,23 +62,24 @@ import speech_app.shared.generated.resources.results_title
 fun ResultsScreen(
     state: ResultsUiState,
     grade: String,
+    isExample: Boolean,
     position: () -> Double,
     onSeek: (Double) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        ResultsHeader(grade = grade, onBack = onBack)
+        ResultsHeader(grade = grade, isExample = isExample, onBack = onBack)
         when (state) {
             ResultsUiState.Loading -> ResultsSkeleton()
             ResultsUiState.Failed -> ResultsError(onRetry = onRetry)
-            is ResultsUiState.Loaded -> ResultsContent(state.report, position, onSeek)
+            is ResultsUiState.Loaded -> ResultsContent(state.report, isExample, position, onSeek)
         }
     }
 }
 
 @Composable
-private fun ResultsHeader(grade: String, onBack: () -> Unit) {
+private fun ResultsHeader(grade: String, isExample: Boolean, onBack: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -87,7 +89,8 @@ private fun ResultsHeader(grade: String, onBack: () -> Unit) {
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
             Text(stringResource(Res.string.results_title), style = MaterialTheme.typography.titleLarge)
             Text(
-                stringResource(Res.string.results_grade_basis, grade) + " · " + stringResource(Res.string.results_mock_badge),
+                stringResource(Res.string.results_grade_basis, grade) +
+                    if (isExample) " · " + stringResource(Res.string.results_mock_badge) else "",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -96,14 +99,14 @@ private fun ResultsHeader(grade: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ResultsContent(report: ResultsReport, position: () -> Double, onSeek: (Double) -> Unit) {
+private fun ResultsContent(report: ResultsReport, isExample: Boolean, position: () -> Double, onSeek: (Double) -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     // Replay and timeline stay pinned so tapping a card visibly moves the playhead.
     Column(
         modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ReplayPanel(report.segments, position)
+        ReplayPanel(report.segments, isExample, position)
         ConfusionTimeline(report.heatmap, report.events, report.durationSeconds, position, onSeek)
     }
     LazyColumn(
@@ -135,9 +138,10 @@ private fun ResultsContent(report: ResultsReport, position: () -> Double, onSeek
     }
 }
 
-// No recording in mock mode: shows the playback time and the sentence being said at that moment.
+// No audio playback yet (mock mode has no recording; live audio is deleted after upload): shows the playback time and
+// the sentence being said at that moment.
 @Composable
-private fun ReplayPanel(segments: List<Segment>, position: () -> Double) {
+private fun ReplayPanel(segments: List<Segment>, isExample: Boolean, position: () -> Double) {
     val t = position()
     val current = segments.lastOrNull { it.tStart <= t } ?: segments.firstOrNull()
     Column(
@@ -148,7 +152,7 @@ private fun ReplayPanel(segments: List<Segment>, position: () -> Double) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            stringResource(Res.string.results_no_recording),
+            stringResource(if (isExample) Res.string.results_no_recording else Res.string.results_no_replay),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

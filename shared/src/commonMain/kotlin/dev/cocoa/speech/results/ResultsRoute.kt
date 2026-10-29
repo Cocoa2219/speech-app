@@ -31,10 +31,12 @@ object MockResults {
     }
 }
 
+// live is the report from a real recording; null shows the example (mock mode).
 @Composable
-fun ResultsRoute(grade: String, onBack: () -> Unit) {
+fun ResultsRoute(grade: String, live: ResultsReport?, onBack: () -> Unit) {
     var attempt by remember { mutableIntStateOf(0) }
-    val state by produceState<ResultsUiState>(ResultsUiState.Loading, attempt) {
+    val state by produceState<ResultsUiState>(live?.let { ResultsUiState.Loaded(it) } ?: ResultsUiState.Loading, attempt, live) {
+        if (live != null) return@produceState
         value = ResultsUiState.Loading
         value = try {
             ResultsUiState.Loaded(MockResults.load())
@@ -50,6 +52,7 @@ fun ResultsRoute(grade: String, onBack: () -> Unit) {
     ResultsScreen(
         state = state,
         grade = grade,
+        isExample = live == null,
         position = { position },
         onSeek = { position = it },
         onRetry = { attempt++ },

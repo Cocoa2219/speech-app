@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
+    <!-- allowBackup off: users may be minors; transcripts and settings stay on this device only. -->
+    <!-- configChanges: recordings and reports live in memory, so rotation must not recreate the activity. -->
     <application
-            android:allowBackup="true"
+            android:allowBackup="false"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name"
             android:roundIcon="@mipmap/ic_launcher_round"
@@ -12,6 +15,7 @@
             android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
                 android:exported="true"
+                android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
                 android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

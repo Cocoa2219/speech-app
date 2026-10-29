@@ -135,7 +135,9 @@ to end on a 60 s clip.
 ## Rules
 
 - **Privacy**: users are students, possibly minors. Delete uploaded media from the Gemini Files API right after
-  processing (third-party docs report ~48 h retention; verify). Keep only transcript, pins, and report on the device. No
+  processing (third-party docs report ~48 h retention; verify). Layer 1 audio (16 kHz mono AAC, ~1 MB for 3 min) is
+  sent inline with `store: false`, so nothing is uploaded to the Files API; the local file is deleted as soon as it is
+  read into memory. `allowBackup` is off. Keep only transcript, pins, and report on the device. No
   accounts. Never send audio, video, or transcripts to analytics or logs. Check consent rules for minors before any
   public release.
 - **Tone**: critique the explanation, never the student. No labels like "nervous" or "unconfident".

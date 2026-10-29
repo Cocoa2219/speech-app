@@ -28,12 +28,15 @@ import speech_app.shared.generated.resources.Res
 import speech_app.shared.generated.resources.setup_grade_change
 import speech_app.shared.generated.resources.setup_grade_hint
 import speech_app.shared.generated.resources.setup_grade_label
+import speech_app.shared.generated.resources.setup_no_key
+import speech_app.shared.generated.resources.setup_record
 import speech_app.shared.generated.resources.setup_show_example
 import speech_app.shared.generated.resources.setup_title
 
 // Owns the grade state and persistence; the screen below stays stateless.
+// onRecord is null when there is no API key; only the example can be shown then.
 @Composable
-fun SetupRoute(store: GradeStore, onShowExample: () -> Unit) {
+fun SetupRoute(store: GradeStore, onRecord: ((grade: String) -> Unit)?, onShowExample: () -> Unit) {
     var grade by remember { mutableStateOf(Grade.resolve(store.load())) }
     SetupScreen(
         grade = grade,
@@ -41,12 +44,13 @@ fun SetupRoute(store: GradeStore, onShowExample: () -> Unit) {
             grade = it
             store.save(it)
         },
+        onRecord = onRecord?.let { record -> { record(grade) } },
         onShowExample = onShowExample,
     )
 }
 
 @Composable
-fun SetupScreen(grade: String, onGradeSelected: (String) -> Unit, onShowExample: () -> Unit) {
+fun SetupScreen(grade: String, onGradeSelected: (String) -> Unit, onRecord: (() -> Unit)?, onShowExample: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -54,8 +58,19 @@ fun SetupScreen(grade: String, onGradeSelected: (String) -> Unit, onShowExample:
         Text(stringResource(Res.string.setup_title), style = MaterialTheme.typography.headlineMedium)
         GradePicker(grade = grade, onGradeSelected = onGradeSelected)
         Spacer(Modifier.weight(1f))
-        // Mock mode (Layer 0) until recording exists.
-        Button(onClick = onShowExample, modifier = Modifier.fillMaxWidth()) {
+        if (onRecord != null) {
+            Button(onClick = onRecord, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.setup_record))
+            }
+        } else {
+            Text(
+                stringResource(Res.string.setup_no_key),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Mock mode (Layer 0): fixture results, no network. Also the demo safety net.
+        OutlinedButton(onClick = onShowExample, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(Res.string.setup_show_example))
         }
     }
