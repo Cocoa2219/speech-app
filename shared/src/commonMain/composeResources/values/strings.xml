@@ -43,7 +43,6 @@
     <string name="results_back">설정으로</string>
     <string name="results_grade_basis">%1$s 기준</string>
     <string name="results_mock_badge">예시 데이터</string>
-    <string name="results_hands">청중이 %1$s번 손을 들었어요</string>
     <string name="results_fix_title">고칠 점 %1$s · %2$s</string>
     <string name="results_fix_how">이렇게 고쳐 보세요</string>
     <string name="results_scrubber">재생 위치</string>
@@ -56,6 +55,7 @@
     <string name="results_timeline_label">청중이 헷갈린 지점</string>
     <string name="results_timeline_desc">헷갈린 지점 %1$s개, 전체 길이 %2$s. 누르면 그 시점으로 이동해요.</string>
     <string name="results_pace_label">말하기 속도</string>
+    <string name="results_pace_average">말하기 속도 평균 %1$s음절/초</string>
     <string name="results_pace_hint">막대가 높을수록 빠르게 말한 구간이에요. 점은 ‘음’, ‘어’ 같은 군말이에요.</string>
     <string name="results_tab_fixes">고칠 점 (상위 3개)</string>
     <string name="results_tab_questions">청중이 물어볼 질문</string>

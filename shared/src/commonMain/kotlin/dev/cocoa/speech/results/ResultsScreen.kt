@@ -47,29 +47,32 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.cocoa.speech.listeners.AnimatedListenerAvatar
 import dev.cocoa.speech.listeners.ListenerAvatar
 import dev.cocoa.speech.listeners.ListenerColors
+import dev.cocoa.speech.logic.PaceStrip
 import dev.cocoa.speech.logic.RankedFix
 import dev.cocoa.speech.logic.ResultsReport
 import dev.cocoa.speech.logic.ResultsReport.Companion.formatTime
@@ -80,6 +83,7 @@ import dev.cocoa.speech.model.Segment
 import dev.cocoa.speech.theme.motionSchemeEffects
 import dev.cocoa.speech.theme.motionSchemeFast
 import dev.cocoa.speech.theme.motionSchemeSpatial
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -91,9 +95,10 @@ import speech_app.shared.generated.resources.results_back
 import speech_app.shared.generated.resources.results_error
 import speech_app.shared.generated.resources.results_fix_how
 import speech_app.shared.generated.resources.results_fix_page
+import speech_app.shared.generated.resources.results_pace_average
+import speech_app.shared.generated.resources.results_pace_hint
 import speech_app.shared.generated.resources.results_fix_title
 import speech_app.shared.generated.resources.results_grade_basis
-import speech_app.shared.generated.resources.results_hands
 import speech_app.shared.generated.resources.results_mock_badge
 import speech_app.shared.generated.resources.results_no_fixes
 import speech_app.shared.generated.resources.results_retry
@@ -101,6 +106,7 @@ import speech_app.shared.generated.resources.results_scrubber
 import speech_app.shared.generated.resources.results_title
 import speech_app.shared.generated.resources.results_video_failed
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 // Results, as designed on the canvas (board D, 2026-10-29): replay on top with a draggable scrubber, then the listener
 // stage, their speech bubbles, and a pager of the top fixes. Playback position drives everything: hands go up and
@@ -157,8 +163,7 @@ private fun ResultsHeader(grade: String, isExample: Boolean, report: ResultsRepo
         }
         Column {
             Text(
-                if (report != null) stringResource(Res.string.results_hands, report.events.size.toString())
-                else stringResource(Res.string.results_title),
+                stringResource(Res.string.results_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -192,10 +197,13 @@ private fun ResultsContent(
     val pager = rememberPagerState { fixes.size }
     val scope = rememberCoroutineScope()
 
-    // Open at the first fix, ready to play. Turning the pager seeks to that fix.
+    // Open at the first fix, ready to play. Turning the pager seeks to that fix as soon as the target page is known
+    // (on release, or when a drag passes halfway), so the replay and stage move with the card, not after it settles.
     LaunchedEffect(report) { fixes.firstOrNull()?.let { onSeek(it.t) } }
     LaunchedEffect(pager, fixes) {
-        snapshotFlow { pager.settledPage }.drop(1).collect { page -> fixes.getOrNull(page)?.let { onSeek(it.t) } }
+        snapshotFlow { pager.targetPage }.distinctUntilChanged().drop(1).collect { page ->
+            fixes.getOrNull(page)?.let { onSeek(it.t) }
+        }
     }
 
     if (report.video == VideoStatus.FAILED) {
@@ -209,6 +217,7 @@ private fun ResultsContent(
     ReplayArea(report.segments, position, replayPlayer)
     Scrubber(
         events = report.events,
+        pace = report.pace,
         duration = report.durationSeconds,
         position = position,
         onScrub = onSeek,
@@ -221,18 +230,31 @@ private fun ResultsContent(
             if (page >= 0) scope.launch { pager.animateScrollToPage(page) }
         },
     )
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-        ListenerStage(report.events, position)
-        Bubbles(report.events, position)
-        if (fixes.isEmpty()) {
-            Text(
-                stringResource(Res.string.results_no_fixes),
-                modifier = Modifier.padding(20.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            FixPager(fixes, report.segments, pager, onPick = { scope.launch { pager.animateScrollToPage(it) } })
+    // The stage, bubbles and cards scroll under the fixed scrubber; once scrolled, a short fade softens the edge.
+    val scroll = rememberScrollState()
+    val bg = MaterialTheme.colorScheme.background
+    val fade by animateFloatAsState(if (scroll.canScrollBackward) 1f else 0f, MaterialTheme.motionSchemeEffects(), label = "fade")
+    Box {
+        Column(Modifier.verticalScroll(scroll).padding(bottom = 24.dp)) {
+            ListenerStage(report.events, position)
+            Bubbles(report.events, position)
+            if (fixes.isEmpty()) {
+                Text(
+                    stringResource(Res.string.results_no_fixes),
+                    modifier = Modifier.padding(20.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                FixPager(fixes, report.segments, pager, onPick = { scope.launch { pager.animateScrollToPage(it) } })
+            }
         }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .graphicsLayer { alpha = fade }
+                .background(Brush.verticalGradient(listOf(bg, bg.copy(alpha = 0f)))),
+        )
     }
 }
 
@@ -266,6 +288,7 @@ private fun Subtitle(segments: List<Segment>, position: () -> Double, modifier: 
 @Composable
 private fun Scrubber(
     events: List<PersonaEvent>,
+    pace: PaceStrip,
     duration: Double,
     position: () -> Double,
     onScrub: (Double) -> Unit,
@@ -277,9 +300,10 @@ private fun Scrubber(
     val track = MaterialTheme.colorScheme.outlineVariant
     val ink = MaterialTheme.colorScheme.onSurface
     val label = stringResource(Res.string.results_scrubber)
-    fun timeAt(x: Float) = (x / trackWidth).coerceIn(0f, 1f) * duration
+    fun timeAt(x: Float, width: Float) = (x / width).coerceIn(0f, 1f) * duration
 
     Column(Modifier.padding(horizontal = 20.dp).zIndex(1f)) {
+        PaceGraph(pace, duration, position)
         Box(
             Modifier
                 .fillMaxWidth()
@@ -288,17 +312,18 @@ private fun Scrubber(
                     contentDescription = label
                     stateDescription = formatTime(position())
                 }
+                // The width is read live: the window can resize (split screen, desktop windows) while the screen is open.
+                .onSizeChanged { trackWidth = it.width.toFloat() }
                 .pointerInput(duration) {
-                    trackWidth = size.width.toFloat()
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         dragging = true
-                        var t = timeAt(down.position.x)
+                        var t = timeAt(down.position.x, size.width.toFloat())
                         onScrub(t)
                         do {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull() ?: break
-                            t = timeAt(change.position.x)
+                            t = timeAt(change.position.x, size.width.toFloat())
                             onScrub(t)
                             change.consume()
                         } while (change.pressed)
@@ -324,10 +349,58 @@ private fun Scrubber(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TimeLabel(position)
+            if (pace.averageSyllablesPerSecond > 0) {
+                Text(
+                    stringResource(Res.string.results_pace_average, formatRate(pace.averageSyllablesPerSecond)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(formatTime(duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
+
+// Speaking pace on the same time axis as the track: one bar per sentence, taller when faster, gaps where the speaker
+// paused, and a dot above a bar for each filler word. Bars up to the playhead are dark like the played track.
+// Descriptive only, never a score.
+@Composable
+private fun PaceGraph(pace: PaceStrip, duration: Double, position: () -> Double) {
+    val unplayed = MaterialTheme.colorScheme.outlineVariant
+    val played = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    val filler = MaterialTheme.colorScheme.tertiary
+    val hint = stringResource(Res.string.results_pace_hint)
+    val maxRate = (pace.samples.maxOfOrNull { it.syllablesPerSecond } ?: 0.0).coerceAtLeast(1.0)
+    Canvas(Modifier.padding(top = 12.dp).fillMaxWidth().height(22.dp).semantics { contentDescription = hint }) {
+        if (duration <= 0.0) return@Canvas
+        val dot = 2.dp.toPx()
+        val barArea = size.height - 4 * dot
+        val radius = CornerRadius(1.5.dp.toPx())
+        fun bars(color: Color) {
+            for (s in pace.samples) {
+                if (s.syllablesPerSecond <= 0) continue
+                val left = (s.tStart / duration).toFloat() * size.width + 1.dp.toPx()
+                val right = (s.tEnd / duration).toFloat() * size.width - 1.dp.toPx()
+                if (right <= left) continue
+                val h = maxOf((s.syllablesPerSecond / maxRate).toFloat() * barArea, 2.dp.toPx())
+                drawRoundRect(color, Offset(left, size.height - h), Size(right - left, h), radius)
+            }
+        }
+        bars(unplayed)
+        val px = (position() / duration).toFloat().coerceIn(0f, 1f) * size.width
+        clipRect(right = px) { bars(played) }
+        for (s in pace.samples) {
+            if (s.fillers == 0) continue
+            val left = (s.tStart / duration).toFloat() * size.width
+            val h = maxOf((s.syllablesPerSecond / maxRate).toFloat() * barArea, 2.dp.toPx())
+            repeat(s.fillers) { k ->
+                drawCircle(filler, dot, Offset(left + dot * (2 + 3 * k), size.height - h - 2 * dot))
+            }
+        }
+    }
+}
+
+private fun formatRate(rate: Double): String = ((rate * 10).roundToInt() / 10.0).toString()
 
 @Composable
 private fun TimeLabel(position: () -> Double) {
@@ -463,7 +536,7 @@ private fun FixCard(fix: RankedFix, index: Int, segments: List<Segment>, isCurre
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
                     .padding(horizontal = 10.dp, vertical = 3.dp),
             )
-            Text(highlighted(segments, first, ListenerColors.tint(first.persona)), style = MaterialTheme.typography.bodyLarge)
+            HighlightedSentence(segments, first, ListenerColors.tint(first.persona))
             Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
             Text(
                 stringResource(Res.string.results_fix_how),
@@ -476,20 +549,42 @@ private fun FixCard(fix: RankedFix, index: Int, segments: List<Segment>, isCurre
     }
 }
 
-// The sentence around the hand-raise, with the quoted words marked in the listener's color.
-private fun highlighted(segments: List<Segment>, event: PersonaEvent, mark: Color): AnnotatedString {
+// The sentence around the hand-raise, with the quoted words marked in the listener's color. The mark is drawn behind
+// the text as rounded pills, one per line the quote spans (span backgrounds in Compose are square-cornered).
+@Composable
+private fun HighlightedSentence(segments: List<Segment>, event: PersonaEvent, mark: Color) {
     val segment = segments.firstOrNull { event.t >= it.tStart && event.t < it.tEnd && event.quote in it.text }
         ?: segments.firstOrNull { event.quote in it.text }
-    return buildAnnotatedString {
-        if (segment == null) {
-            withStyle(SpanStyle(background = mark)) { append(event.quote) }
-            return@buildAnnotatedString
-        }
-        val start = segment.text.indexOf(event.quote)
-        append(segment.text.substring(0, start))
-        withStyle(SpanStyle(background = mark)) { append(event.quote) }
-        append(segment.text.substring(start + event.quote.length))
-    }
+    val text = segment?.text ?: event.quote
+    val start = text.indexOf(event.quote).coerceAtLeast(0)
+    val end = (start + event.quote.length).coerceAtMost(text.length)
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyLarge,
+        onTextLayout = { layout = it },
+        modifier = Modifier.drawBehind {
+            val l = layout ?: return@drawBehind
+            if (start >= end) return@drawBehind
+            val padX = 4.dp.toPx()
+            val insetY = 1.dp.toPx()
+            for (line in l.getLineForOffset(start)..l.getLineForOffset(end - 1)) {
+                val from = maxOf(start, l.getLineStart(line))
+                val to = minOf(end, l.getLineEnd(line, visibleEnd = true))
+                if (from >= to) continue
+                val left = l.getBoundingBox(from).left
+                val right = l.getBoundingBox(to - 1).right
+                val top = l.getLineTop(line) + insetY
+                val height = l.getLineBottom(line) - insetY - top
+                drawRoundRect(
+                    mark,
+                    topLeft = Offset(left - padX, top),
+                    size = Size(right - left + 2 * padX, height),
+                    cornerRadius = CornerRadius(height / 2),
+                )
+            }
+        },
+    )
 }
 
 @Composable

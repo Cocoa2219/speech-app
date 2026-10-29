@@ -63,8 +63,9 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
 6. **Results screen** (designed on the "Listener characters" canvas, board D; M3 Expressive theme and motion): replay
    on top with a subtitle; a draggable scrubber with listener-colored marks, showing a small pill (time + faces) while
    dragging; the listener stage (hands rise while playback is at their moments); speech bubbles with the reason or the
-   kid's question; a centered pager of the top 3 fixes (choosing one seeks to it). No separate questions tab, heatmap,
-   or pace strip on this screen (pace data stays in `ResultsReport`).
+   kid's question; a centered pager of the top 3 fixes (choosing one seeks to it); a thin pace graph on the scrubber's time
+   axis (a bar per sentence, taller when faster, gaps for pauses, dots for fillers) with the average syllables per
+   second, descriptive only. No separate questions tab or heatmap.
 
 ## Transcription notes (verify on Day 1)
 
