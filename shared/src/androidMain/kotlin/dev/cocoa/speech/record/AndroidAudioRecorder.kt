@@ -3,8 +3,10 @@ package dev.cocoa.speech.record
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
+import dev.cocoa.speech.replay.ReplayFiles
 import java.io.File
 
+// The finished file is moved to ReplayFiles for replay on the results screen.
 // 16 kHz mono AAC in an ADTS stream ("audio/aac", a Gemini-supported type). Gemini downsamples audio to 16 kbps
 // anyway, so a higher rate only adds upload time. 3 minutes is about 1 MB, well under the 20 MB inline limit.
 class AndroidAudioRecorder(private val context: Context) : Capture {
@@ -14,6 +16,7 @@ class AndroidAudioRecorder(private val context: Context) : Capture {
 
     override fun start() {
         cancel()
+        ReplayFiles.clear(context) // only the latest recording is kept for replay
         @Suppress("DEPRECATION")
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()
         r.setAudioSource(MediaRecorder.AudioSource.MIC)
@@ -48,7 +51,10 @@ class AndroidAudioRecorder(private val context: Context) : Capture {
         clock.stop()
         try {
             r.stop()
-            return Recording(file.readBytes(), "audio/aac", clock.seconds())
+            val audio = file.readBytes()
+            val kept = File(ReplayFiles.dir(context), "last.aac")
+            val replay = if (file.renameTo(kept)) ReplayMedia(kept.absolutePath, isVideo = false) else null
+            return Recording(audio, "audio/aac", clock.seconds(), replay = replay)
         } finally {
             release(r)
         }

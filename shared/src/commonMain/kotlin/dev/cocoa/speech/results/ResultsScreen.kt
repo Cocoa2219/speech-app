@@ -69,13 +69,14 @@ fun ResultsScreen(
     onSeek: (Double) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
+    replayPlayer: (@Composable () -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         ResultsHeader(grade = grade, isExample = isExample, onBack = onBack)
         when (state) {
             ResultsUiState.Loading -> ResultsSkeleton()
             ResultsUiState.Failed -> ResultsError(onRetry = onRetry)
-            is ResultsUiState.Loaded -> ResultsContent(state.report, isExample, position, onSeek)
+            is ResultsUiState.Loaded -> ResultsContent(state.report, isExample, position, onSeek, replayPlayer)
         }
     }
 }
@@ -101,7 +102,13 @@ private fun ResultsHeader(grade: String, isExample: Boolean, onBack: () -> Unit)
 }
 
 @Composable
-private fun ResultsContent(report: ResultsReport, isExample: Boolean, position: () -> Double, onSeek: (Double) -> Unit) {
+private fun ResultsContent(
+    report: ResultsReport,
+    isExample: Boolean,
+    position: () -> Double,
+    onSeek: (Double) -> Unit,
+    replayPlayer: (@Composable () -> Unit)?,
+) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     // Replay and timeline stay pinned so tapping a card visibly moves the playhead.
     Column(
@@ -115,7 +122,7 @@ private fun ResultsContent(report: ResultsReport, isExample: Boolean, position: 
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        ReplayPanel(report.segments, isExample, position)
+        ReplayPanel(report.segments, isExample, position, replayPlayer)
         ConfusionTimeline(report.heatmap, report.events, report.durationSeconds, position, onSeek)
     }
     LazyColumn(
@@ -147,12 +154,15 @@ private fun ResultsContent(report: ResultsReport, isExample: Boolean, position: 
     }
 }
 
-// No audio playback yet (mock mode has no recording; live audio is deleted after upload): shows the playback time and
-// the sentence being said at that moment.
+// The player (when there is a recording to replay), the playback time, and the sentence being said at that moment.
+// Mock mode has no recording, so it shows only the time and sentence.
 @Composable
-private fun ReplayPanel(segments: List<Segment>, isExample: Boolean, position: () -> Double) {
-    val t = position()
-    val current = segments.lastOrNull { it.tStart <= t } ?: segments.firstOrNull()
+private fun ReplayPanel(
+    segments: List<Segment>,
+    isExample: Boolean,
+    position: () -> Double,
+    replayPlayer: (@Composable () -> Unit)?,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -160,14 +170,26 @@ private fun ReplayPanel(segments: List<Segment>, isExample: Boolean, position: (
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            stringResource(if (isExample) Res.string.results_no_recording else Res.string.results_no_replay),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(formatTime(t), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        Text(current?.text.orEmpty(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (replayPlayer != null) {
+            replayPlayer()
+        } else {
+            Text(
+                stringResource(if (isExample) Res.string.results_no_recording else Res.string.results_no_replay),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        PlaybackCaption(segments, position)
     }
+}
+
+// Reads the position itself so the 10 Hz playback tick re-runs only this caption, not the player above it.
+@Composable
+private fun PlaybackCaption(segments: List<Segment>, position: () -> Double) {
+    val t = position()
+    val current = segments.lastOrNull { it.tStart <= t } ?: segments.firstOrNull()
+    Text(formatTime(t), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    Text(current?.text.orEmpty(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

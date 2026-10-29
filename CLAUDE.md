@@ -141,9 +141,11 @@ to end on a 60 s clip.
 ## Rules
 
 - **Privacy**: users are students, possibly minors. Delete uploaded media from the Gemini Files API right after
-  processing (third-party docs report ~48 h retention; verify). Layer 1 audio (16 kHz mono AAC, ~1 MB for 3 min) is
-  sent inline with `store: false`, so nothing is uploaded to the Files API; the local file is deleted as soon as it is
-  read into memory. `allowBackup` is off. Keep only transcript, pins, and report on the device. No
+  processing (the Files API keeps files 48 h; verified in the docs 2026-10-29). Layer 1 audio (16 kHz mono AAC, ~1 MB for 3 min) is
+  sent inline with `store: false`. Video goes through the Files API and is deleted there right after the scene call.
+  Replay (developer decision, 2026-10-29): the latest recording (audio or video) is kept in app-private storage
+  (`files/replay`, `ReplayFiles`) so the results screen can replay it with synced pins; only one is kept, and starting
+  a new recording deletes it. `allowBackup` is off. Otherwise keep only transcript, pins, and report on the device. No
   accounts. Never send audio, video, or transcripts to analytics or logs. Check consent rules for minors before any
   public release.
 - **Tone**: critique the explanation, never the student. No labels like "nervous" or "unconfident".

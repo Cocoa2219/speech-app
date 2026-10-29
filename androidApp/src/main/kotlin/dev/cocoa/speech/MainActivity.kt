@@ -12,6 +12,8 @@ import dev.cocoa.speech.gemini.createGemini
 import dev.cocoa.speech.pipeline.LivePipeline
 import dev.cocoa.speech.record.AndroidAudioRecorder
 import dev.cocoa.speech.record.Recording
+import dev.cocoa.speech.record.ReplayMedia
+import dev.cocoa.speech.replay.AndroidReplayPlayer
 import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.PrefsGradeStore
@@ -39,6 +41,7 @@ class MainActivity : ComponentActivity() {
             micPermission = micPermission,
             pipeline = LivePipeline(gemini.generator, uploader = gemini.files),
             videoRecord = { onFinished, onCancel -> VideoRecordRoute(cameraPermission, onFinished, onCancel) },
+            replayPlayer = { media, seek, onPosition -> AndroidReplayPlayer(media, seek, onPosition) },
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
         )
         setContent {
@@ -53,7 +56,12 @@ class MainActivity : ComponentActivity() {
         val bytes = file.readBytes()
         val header = ByteBuffer.wrap(bytes, 0, 44).order(ByteOrder.LITTLE_ENDIAN)
         val bytesPerSecond = header.getInt(28) // WAV byte rate
-        return Recording(bytes, "audio/wav", (bytes.size - 44).toDouble() / bytesPerSecond)
+        return Recording(
+            bytes,
+            "audio/wav",
+            (bytes.size - 44).toDouble() / bytesPerSecond,
+            replay = ReplayMedia(file.absolutePath, isVideo = false),
+        )
     }
 }
 

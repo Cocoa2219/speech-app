@@ -207,7 +207,7 @@ class AnalysisRunTest {
             transcriber = Transcriber(client, "T"),
             analyzer = Analyzer(client, "A"),
             writer = PersonaWriter(client, "W", parallel = parallel, log = {}),
-            video = uploader?.let { VideoInput("video/mp4", read = { byteArrayOf(9) }, discard = {}) },
+            video = uploader?.let { VideoInput("video/mp4", read = { byteArrayOf(9) }) },
             describer = uploader?.let { SceneDescriber(client, it, "V") },
             log = {},
         )

@@ -3,7 +3,6 @@ package dev.cocoa.speech
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +17,8 @@ import dev.cocoa.speech.record.Capture
 import dev.cocoa.speech.record.Permission
 import dev.cocoa.speech.record.RecordRoute
 import dev.cocoa.speech.record.Recording
+import dev.cocoa.speech.record.ReplayMedia
+import dev.cocoa.speech.results.ReplayPlayer
 import dev.cocoa.speech.results.ResultsRoute
 import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
@@ -34,6 +35,7 @@ class LiveDeps(
     val micPermission: Permission,
     val pipeline: LivePipeline,
     val videoRecord: VideoRecordScreen? = null,
+    val replayPlayer: ReplayPlayer? = null,
     val debugSample: (() -> Recording?)? = null,
 )
 
@@ -45,7 +47,7 @@ private sealed interface Screen {
     data class Record(val grade: String) : Screen
     data class VideoRecord(val grade: String) : Screen
     class Processing(val grade: String, val recording: Recording, val fromSample: Boolean = false) : Screen
-    class Results(val grade: String, val live: ResultsReport?) : Screen
+    class Results(val grade: String, val live: ResultsReport?, val replay: ReplayMedia? = null) : Screen
 }
 
 @Composable
@@ -82,14 +84,12 @@ fun App(gradeStore: GradeStore, live: LiveDeps?, backHandler: BackHandlerSlot = 
                     home,
                 )
                 is Screen.Processing -> {
-                    // The local video lives only as long as its run (CLAUDE.md privacy rules).
-                    DisposableEffect(s) { onDispose { s.recording.video?.discard() } }
                     ProcessingRoute(
                         stages = if (s.recording.video != null) Stage.entries else Stage.entries - Stage.VIDEO,
                         createRun = { live!!.pipeline.newRun(s.recording, s.grade) },
                         onDone = { report ->
                             if (s.fromSample) scope.launch { runCatching { SampleCheck.log(report) } }
-                            screen = Screen.Results(s.grade, report)
+                            screen = Screen.Results(s.grade, report, s.recording.replay)
                         },
                         onRerecord = {
                             screen = if (s.recording.video != null) Screen.VideoRecord(s.grade) else Screen.Record(s.grade)
@@ -97,7 +97,13 @@ fun App(gradeStore: GradeStore, live: LiveDeps?, backHandler: BackHandlerSlot = 
                         onHome = home,
                     )
                 }
-                is Screen.Results -> ResultsRoute(grade = s.grade, live = s.live, onBack = home)
+                is Screen.Results -> ResultsRoute(
+                    grade = s.grade,
+                    live = s.live,
+                    onBack = home,
+                    replay = s.replay,
+                    player = live?.replayPlayer,
+                )
             }
         }
     }
