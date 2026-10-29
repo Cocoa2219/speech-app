@@ -9,4 +9,8 @@ object PromptTemplate {
         template
             .replace("{{grade}}", Grade.resolve(grade, mockMode))
             .replace("{{duration_seconds}}", durationSeconds.toInt().toString())
+
+    // Fills {{grade}} in prompts/persona.md with the same never-empty grade the analyzer saw.
+    fun persona(template: String, grade: String?, mockMode: Boolean = false): String =
+        template.replace("{{grade}}", Grade.resolve(grade, mockMode))
 }
