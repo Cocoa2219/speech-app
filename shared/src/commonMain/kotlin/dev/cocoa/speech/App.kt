@@ -1,48 +1,27 @@
 package dev.cocoa.speech
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
-import speech_app.shared.generated.resources.Res
-import speech_app.shared.generated.resources.compose_multiplatform
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import dev.cocoa.speech.results.ResultsRoute
+import dev.cocoa.speech.setup.Grade
+import dev.cocoa.speech.setup.GradeStore
+import dev.cocoa.speech.setup.SetupRoute
 
 @Composable
-@Preview
-fun App() {
+fun App(gradeStore: GradeStore) {
     MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
-                }
+        Surface {
+            // Two screens for now; a navigation library can wait until there are more.
+            var showResults by rememberSaveable { mutableStateOf(false) }
+            if (showResults) {
+                ResultsRoute(grade = Grade.resolve(null, mockMode = true), onBack = { showResults = false })
+            } else {
+                SetupRoute(store = gradeStore, onShowExample = { showResults = true })
             }
         }
     }

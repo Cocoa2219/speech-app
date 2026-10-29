@@ -1,0 +1,28 @@
+<resources>
+    <string name="setup_title">발표 준비</string>
+    <string name="setup_grade_label">듣는 사람 학년</string>
+    <string name="setup_grade_hint">이 학년의 학생이 모를 만한 내용을 기준으로 찾아요.</string>
+    <string name="setup_grade_change">학년 바꾸기</string>
+    <string name="setup_show_example">예시 결과 보기</string>
+
+    <string name="results_title">결과</string>
+    <string name="results_back">설정으로</string>
+    <string name="results_grade_basis">%1$s 기준</string>
+    <string name="results_mock_badge">예시 데이터</string>
+    <string name="results_no_recording">녹화 영상이 아직 없어요. 예시 대본으로 보여 줘요.</string>
+    <string name="results_timeline_label">청중이 헷갈린 지점</string>
+    <string name="results_timeline_desc">헷갈린 지점 %1$s개, 전체 길이 %2$s. 누르면 그 시점으로 이동해요.</string>
+    <string name="results_pace_label">말하기 속도</string>
+    <string name="results_pace_hint">막대가 높을수록 빠르게 말한 구간이에요. 점은 ‘음’, ‘어’ 같은 군말이에요.</string>
+    <string name="results_tab_fixes">고칠 점 (상위 3개)</string>
+    <string name="results_tab_questions">청중이 물어볼 질문</string>
+    <string name="results_listeners_count">청중 %1$s명에게 도움이 돼요</string>
+    <string name="results_no_fixes">헷갈린 지점을 찾지 못했어요.</string>
+    <string name="results_no_questions">청중이 물어볼 질문이 없어요.</string>
+    <string name="results_error">결과를 불러오지 못했어요.</string>
+    <string name="results_retry">다시 시도</string>
+
+    <string name="persona_classmate">친구</string>
+    <string name="persona_teacher">선생님</string>
+    <string name="persona_kid">동생</string>
+</resources>
