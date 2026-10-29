@@ -1,0 +1,23 @@
+{
+  "about": "Hand-raises a middle-school (중학교 2학년) listener should and should not get from script.txt. Written by hand from the script, before any live run; a miss is a prompt or rule question, not automatically a bug. Matching: persona/type when given, and quote_contains found in the event quote (or the event quote in it), after normalizing (letters and digits only).",
+  "must": [
+    {"id": "term-orbital-plane", "persona": "classmate", "type": "undefined_term", "quote_contains": "공전 궤도면",
+     "note": "Used without explanation in the third sentence."},
+    {"id": "term-culmination", "persona": "classmate", "type": "undefined_term", "quote_contains": "남중 고도",
+     "note": "Specialist term, never defined."},
+    {"id": "skip-tilt-to-altitude", "persona": "classmate", "type": "skipped_step", "quote_contains": "여름에는 남중 고도가 높아지고",
+     "note": "Tilt -> higher sun in summer needs 'the hemisphere leans toward the sun in summer', which is never said."},
+    {"id": "skip-australia", "persona": "classmate", "type": "skipped_step", "quote_contains": "호주에서는 크리스마스를 여름에",
+     "note": "Needs 'Australia is in the southern hemisphere', never said."},
+    {"id": "teacher-farthest", "persona": "teacher", "type": "no_evidence", "quote_contains": "태양에서 가장 멀리 있어요",
+     "note": "Surprising claim with no reason or evidence."},
+    {"id": "kid-why-opposite", "persona": "kid", "type": "why_question", "quote_contains": "남반구는 계절이 반대예요",
+     "note": "Stated with no reason."}
+  ],
+  "must_not": [
+    {"id": "no-intro", "quote_contains": "오늘은 계절이 생기는 이유를 설명해 볼게요",
+     "note": "The introduction is not a claim."},
+    {"id": "no-closing", "quote_contains": "이상입니다",
+     "note": "The closing line is not a claim."}
+  ]
+}

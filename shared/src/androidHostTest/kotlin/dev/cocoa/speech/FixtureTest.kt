@@ -1,5 +1,6 @@
 package dev.cocoa.speech
 
+import dev.cocoa.speech.logic.Expectations
 import dev.cocoa.speech.logic.PersonaRules
 import dev.cocoa.speech.logic.QuoteValidator
 import dev.cocoa.speech.model.AnalyzerOutput
@@ -48,5 +49,17 @@ class FixtureTest {
             listOf("여름에는 덥고 겨울에는 추워요", "적도 근처는 계절 변화가 거의 없어요"),
             skipped.map { it.quote },
         )
+    }
+
+    @Test
+    fun sampleExpectationsQuoteTheScript() {
+        val script = QuoteValidator.normalize(File(root, "sample-seasons/script.txt").readText())
+        val expectations = json.decodeFromString<Expectations>(File(root, "sample-seasons/expected.json").readText())
+        val all = expectations.must + expectations.mustNot
+        assertTrue(expectations.must.isNotEmpty())
+        assertEquals(all.size, all.map { it.id }.toSet().size, "Duplicate expectation id")
+        for (e in all) {
+            assertTrue(QuoteValidator.normalize(e.quoteContains) in script, "Not in script.txt: ${e.id}")
+        }
     }
 }
