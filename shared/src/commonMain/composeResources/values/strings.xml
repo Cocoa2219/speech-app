@@ -43,6 +43,11 @@
     <string name="results_back">설정으로</string>
     <string name="results_grade_basis">%1$s 기준</string>
     <string name="results_mock_badge">예시 데이터</string>
+    <string name="results_hands">청중이 %1$s번 손을 들었어요</string>
+    <string name="results_fix_title">고칠 점 %1$s · %2$s</string>
+    <string name="results_fix_how">이렇게 고쳐 보세요</string>
+    <string name="results_scrubber">재생 위치</string>
+    <string name="results_fix_page">고칠 점 %1$s</string>
     <string name="results_play">재생</string>
     <string name="results_pause">일시정지</string>
     <string name="results_video_failed">영상 분석에 실패해서 소리만으로 분석했어요.</string>

@@ -1,48 +1,87 @@
 package dev.cocoa.speech.results
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import dev.cocoa.speech.logic.RankedFix
-import dev.cocoa.speech.logic.ResultsReport
-import dev.cocoa.speech.logic.VideoStatus
+import androidx.compose.ui.zIndex
 import dev.cocoa.speech.listeners.AnimatedListenerAvatar
 import dev.cocoa.speech.listeners.ListenerAvatar
 import dev.cocoa.speech.listeners.ListenerColors
+import dev.cocoa.speech.logic.RankedFix
+import dev.cocoa.speech.logic.ResultsReport
 import dev.cocoa.speech.logic.ResultsReport.Companion.formatTime
+import dev.cocoa.speech.logic.VideoStatus
 import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.model.PersonaEvent
 import dev.cocoa.speech.model.Segment
+import dev.cocoa.speech.theme.motionSchemeEffects
+import dev.cocoa.speech.theme.motionSchemeFast
+import dev.cocoa.speech.theme.motionSchemeSpatial
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import speech_app.shared.generated.resources.Res
 import speech_app.shared.generated.resources.persona_classmate
@@ -50,18 +89,32 @@ import speech_app.shared.generated.resources.persona_kid
 import speech_app.shared.generated.resources.persona_teacher
 import speech_app.shared.generated.resources.results_back
 import speech_app.shared.generated.resources.results_error
+import speech_app.shared.generated.resources.results_fix_how
+import speech_app.shared.generated.resources.results_fix_page
+import speech_app.shared.generated.resources.results_fix_title
 import speech_app.shared.generated.resources.results_grade_basis
-import speech_app.shared.generated.resources.results_listeners_count
+import speech_app.shared.generated.resources.results_hands
 import speech_app.shared.generated.resources.results_mock_badge
 import speech_app.shared.generated.resources.results_no_fixes
-import speech_app.shared.generated.resources.results_no_questions
-import speech_app.shared.generated.resources.results_no_recording
-import speech_app.shared.generated.resources.results_no_replay
-import speech_app.shared.generated.resources.results_video_failed
 import speech_app.shared.generated.resources.results_retry
-import speech_app.shared.generated.resources.results_tab_fixes
-import speech_app.shared.generated.resources.results_tab_questions
+import speech_app.shared.generated.resources.results_scrubber
 import speech_app.shared.generated.resources.results_title
+import speech_app.shared.generated.resources.results_video_failed
+import kotlin.math.abs
+
+// Results, as designed on the canvas (board D, 2026-10-29): replay on top with a draggable scrubber, then the listener
+// stage, their speech bubbles, and a pager of the top fixes. Playback position drives everything: hands go up and
+// bubbles appear while the position is at a listener's moment; choosing a fix seeks to it.
+
+// A listener's hand stays up from shortly before its moment until a few seconds after. The lead also lets every hand
+// in a fix's cluster (e.g. 39.0 s and 39.5 s) be up when the fix is selected.
+private const val RAISE_LEAD_S = 1.0
+private const val RAISE_HOLD_S = 3.0
+
+// While dragging, hand-raises within this distance of the handle count as "here".
+private const val NEAR_S = 1.5
+
+private fun PersonaEvent.activeAt(t: Double) = t >= this.t - RAISE_LEAD_S && t <= this.t + RAISE_HOLD_S
 
 @Composable
 fun ResultsScreen(
@@ -74,218 +127,368 @@ fun ResultsScreen(
     onBack: () -> Unit,
     replayPlayer: (@Composable () -> Unit)? = null,
 ) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        ResultsHeader(grade = grade, isExample = isExample, onBack = onBack)
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
+        ResultsHeader(grade, isExample, (state as? ResultsUiState.Loaded)?.report, onBack)
         when (state) {
-            ResultsUiState.Loading -> ResultsSkeleton()
-            ResultsUiState.Failed -> ResultsError(onRetry = onRetry)
-            is ResultsUiState.Loaded -> ResultsContent(state.report, isExample, position, onSeek, replayPlayer)
+            ResultsUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ExpressiveLoading() }
+            ResultsUiState.Failed -> ResultsError(onRetry)
+            is ResultsUiState.Loaded -> ResultsContent(state.report, position, onSeek, replayPlayer)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ExpressiveLoading() = LoadingIndicator()
+
+@Composable
+private fun ResultsHeader(grade: String, isExample: Boolean, report: ResultsReport?, onBack: () -> Unit) {
+    val basis = stringResource(Res.string.results_grade_basis, grade)
+    val subtitle = buildString {
+        append(basis)
+        if (report != null) {
+            append(" · ").append(formatTime(report.durationSeconds))
+        }
+        if (isExample) append(" · ").append(stringResource(Res.string.results_mock_badge))
+    }
+    Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onBack) {
+            BackChevron(stringResource(Res.string.results_back))
+        }
+        Column {
+            Text(
+                if (report != null) stringResource(Res.string.results_hands, report.events.size.toString())
+                else stringResource(Res.string.results_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun ResultsHeader(grade: String, isExample: Boolean, onBack: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TextButton(onClick = onBack) { Text(stringResource(Res.string.results_back)) }
-        Spacer(Modifier.weight(1f))
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
-            Text(stringResource(Res.string.results_title), style = MaterialTheme.typography.titleLarge)
-            Text(
-                stringResource(Res.string.results_grade_basis, grade) +
-                    if (isExample) " · " + stringResource(Res.string.results_mock_badge) else "",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+private fun BackChevron(label: String) {
+    val color = MaterialTheme.colorScheme.onSurface
+    Canvas(Modifier.size(24.dp).semantics { contentDescription = label }) {
+        val w = size.width
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.62f, w * 0.2f)
+            lineTo(w * 0.33f, w * 0.5f)
+            lineTo(w * 0.62f, w * 0.8f)
         }
+        drawPath(path, color, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
     }
 }
 
 @Composable
 private fun ResultsContent(
     report: ResultsReport,
-    isExample: Boolean,
     position: () -> Double,
     onSeek: (Double) -> Unit,
     replayPlayer: (@Composable () -> Unit)?,
 ) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    // Replay and timeline stay pinned so tapping a card visibly moves the playhead.
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (report.video == VideoStatus.FAILED) {
-            Text(
-                stringResource(Res.string.results_video_failed),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        ReplayPanel(report.segments, report.events, isExample, position, replayPlayer)
-        ConfusionTimeline(report.heatmap, report.events, report.durationSeconds, position, onSeek)
-    }
-    LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(key = "pace", contentType = "pace") { PaceStripView(report.pace, report.durationSeconds) }
-        item(key = "tabs", contentType = "tabs") {
-            PrimaryTabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(Res.string.results_tab_fixes)) })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(Res.string.results_tab_questions)) })
-            }
-        }
-        if (tab == 0) {
-            if (report.topFixes.isEmpty()) {
-                item(key = "no-fixes", contentType = "empty") { EmptyHint(stringResource(Res.string.results_no_fixes)) }
-            }
-            items(report.topFixes, key = { "fix-${it.t}-${it.quote}" }, contentType = { "fix" }) { fix ->
-                FixCard(fix, onSeek)
-            }
-        } else {
-            if (report.questions.isEmpty()) {
-                item(key = "no-questions", contentType = "empty") { EmptyHint(stringResource(Res.string.results_no_questions)) }
-            }
-            items(report.questions, key = { "q-${it.t}-${it.quote}" }, contentType = { "question" }) { event ->
-                QuestionCard(event, onSeek)
-            }
-        }
-    }
-}
+    val fixes = report.topFixes
+    val pager = rememberPagerState { fixes.size }
+    val scope = rememberCoroutineScope()
 
-// The player (when there is a recording to replay), the playback time, and the sentence being said at that moment.
-// Mock mode has no recording, so it shows only the time and sentence.
-@Composable
-private fun ReplayPanel(
-    segments: List<Segment>,
-    events: List<PersonaEvent>,
-    isExample: Boolean,
-    position: () -> Double,
-    replayPlayer: (@Composable () -> Unit)?,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (replayPlayer != null) {
-            replayPlayer()
-        } else {
+    // Open at the first fix, ready to play. Turning the pager seeks to that fix.
+    LaunchedEffect(report) { fixes.firstOrNull()?.let { onSeek(it.t) } }
+    LaunchedEffect(pager, fixes) {
+        snapshotFlow { pager.settledPage }.drop(1).collect { page -> fixes.getOrNull(page)?.let { onSeek(it.t) } }
+    }
+
+    if (report.video == VideoStatus.FAILED) {
+        Text(
+            stringResource(Res.string.results_video_failed),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+    ReplayArea(report.segments, position, replayPlayer)
+    Scrubber(
+        events = report.events,
+        duration = report.durationSeconds,
+        position = position,
+        onScrub = onSeek,
+        // On release, snap to the nearest hand-raise; if it belongs to a top fix, turn the pager to it.
+        onRelease = { t ->
+            val hit = report.events.filter { abs(it.t - t) <= NEAR_S }.minByOrNull { abs(it.t - t) }
+            val target = hit?.t ?: t
+            onSeek(target)
+            val page = fixes.indexOfFirst { fix -> fix.events.any { abs(it.t - target) < 0.01 } }
+            if (page >= 0) scope.launch { pager.animateScrollToPage(page) }
+        },
+    )
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+        ListenerStage(report.events, position)
+        Bubbles(report.events, position)
+        if (fixes.isEmpty()) {
             Text(
-                stringResource(if (isExample) Res.string.results_no_recording else Res.string.results_no_replay),
-                style = MaterialTheme.typography.labelMedium,
+                stringResource(Res.string.results_no_fixes),
+                modifier = Modifier.padding(20.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        } else {
+            FixPager(fixes, report.segments, pager, onPick = { scope.launch { pager.animateScrollToPage(it) } })
         }
-        PlaybackCaption(segments, position)
-        ListenerRow(events, position)
     }
 }
 
-// The three listeners; each raises a hand while playback is at one of their moments. Reads the position itself so
-// only this row re-runs as playback moves, and each avatar animates only when its raised state flips.
+// Dark replay area: the player when there is a recording, with the sentence being said shown as a subtitle.
 @Composable
-private fun ListenerRow(events: List<PersonaEvent>, position: () -> Double) {
+private fun ReplayArea(segments: List<Segment>, position: () -> Double, replayPlayer: (@Composable () -> Unit)?) {
+    Box(Modifier.fillMaxWidth().height(232.dp).background(ListenerColors.Ink)) {
+        replayPlayer?.invoke()
+        Subtitle(segments, position, Modifier.align(if (replayPlayer == null) Alignment.Center else Alignment.BottomCenter))
+    }
+}
+
+@Composable
+private fun Subtitle(segments: List<Segment>, position: () -> Double, modifier: Modifier) {
     val t = position()
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        for (persona in Persona.entries) {
-            val raised = events.any { it.persona == persona && t >= it.t - RAISE_LEAD_S && t <= it.t + RAISE_HOLD_S }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                AnimatedListenerAvatar(persona, raised, Modifier.size(56.dp))
-                Text(personaLabel(persona), style = MaterialTheme.typography.labelSmall)
+    val current = segments.lastOrNull { it.tStart <= t } ?: segments.firstOrNull() ?: return
+    Text(
+        current.text,
+        modifier = modifier
+            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        color = Color.White,
+        style = MaterialTheme.typography.bodyLarge,
+        textAlign = TextAlign.Center,
+    )
+}
+
+// Track with listener-colored moment marks. Dragging seeks continuously and shows a small pill above the handle with
+// the time and the faces of whoever raised a hand there.
+@Composable
+private fun Scrubber(
+    events: List<PersonaEvent>,
+    duration: Double,
+    position: () -> Double,
+    onScrub: (Double) -> Unit,
+    onRelease: (Double) -> Unit,
+) {
+    var dragging by remember { mutableStateOf(false) }
+    var trackWidth by remember { mutableFloatStateOf(1f) }
+    val handle by animateDpAsState(if (dragging) 22.dp else 14.dp, MaterialTheme.motionSchemeFast(), label = "handle")
+    val track = MaterialTheme.colorScheme.outlineVariant
+    val ink = MaterialTheme.colorScheme.onSurface
+    val label = stringResource(Res.string.results_scrubber)
+    fun timeAt(x: Float) = (x / trackWidth).coerceIn(0f, 1f) * duration
+
+    Column(Modifier.padding(horizontal = 20.dp).zIndex(1f)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .semantics {
+                    contentDescription = label
+                    stateDescription = formatTime(position())
+                }
+                .pointerInput(duration) {
+                    trackWidth = size.width.toFloat()
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        dragging = true
+                        var t = timeAt(down.position.x)
+                        onScrub(t)
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            t = timeAt(change.position.x)
+                            onScrub(t)
+                            change.consume()
+                        } while (change.pressed)
+                        dragging = false
+                        onRelease(t)
+                    }
+                },
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                if (duration <= 0.0) return@Canvas
+                val y = size.height / 2
+                val px = (position() / duration).toFloat().coerceIn(0f, 1f) * size.width
+                drawRoundRect(track, Offset(0f, y - 2.dp.toPx()), Size(size.width, 4.dp.toPx()), CornerRadius(2.dp.toPx()))
+                drawRoundRect(ink, Offset(0f, y - 2.dp.toPx()), Size(px, 4.dp.toPx()), CornerRadius(2.dp.toPx()))
+                for (e in events) {
+                    val x = (e.t / duration).toFloat() * size.width
+                    drawCircle(ListenerColors.main(e.persona), 3.5.dp.toPx(), Offset(x, y))
+                }
+                drawCircle(ink, handle.toPx() / 2, Offset(px, y))
+                if (dragging) drawCircle(ink.copy(alpha = 0.15f), handle.toPx(), Offset(px, y))
             }
+            if (dragging) ScrubPill(events, duration, position, trackWidth)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TimeLabel(position)
+            Text(formatTime(duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-// A hand goes up just before the quoted moment and stays up long enough to notice.
-private const val RAISE_LEAD_S = 0.3
-private const val RAISE_HOLD_S = 3.0
-
-// Reads the position itself so the 10 Hz playback tick re-runs only this caption, not the player above it.
 @Composable
-private fun PlaybackCaption(segments: List<Segment>, position: () -> Double) {
-    val t = position()
-    val current = segments.lastOrNull { it.tStart <= t } ?: segments.firstOrNull()
-    Text(formatTime(t), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-    Text(current?.text.orEmpty(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun TimeLabel(position: () -> Double) {
+    Text(formatTime(position()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
-private fun FixCard(fix: RankedFix, onSeek: (Double) -> Unit) {
-    Card(onClick = { onSeek(fix.t) }, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(formatTime(fix.t), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+private fun ScrubPill(events: List<PersonaEvent>, duration: Double, position: () -> Double, trackWidth: Float) {
+    val t = position()
+    val here = Persona.entries.filter { p -> events.any { it.persona == p && abs(it.t - t) <= NEAR_S } }
+    Row(
+        Modifier
+            .layout { measurable, constraints ->
+                val p = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                val handleX = ((t / duration).toFloat().coerceIn(0f, 1f) * trackWidth).toInt()
+                layout(0, 0) {
+                    p.place((handleX - p.width / 2).coerceIn(0, (trackWidth.toInt() - p.width).coerceAtLeast(0)), -p.height + 4.dp.roundToPx())
+                }
+            }
+            .height(28.dp)
+            .background(ListenerColors.Ink, RoundedCornerShape(14.dp))
+            .padding(start = 10.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy((-4).dp),
+    ) {
+        Text(formatTime(t), color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(end = 8.dp))
+        for (p in here) ListenerAvatar(p, raise = { 1f }, modifier = Modifier.size(22.dp))
+    }
+}
+
+// The three listeners; whoever is at one of their moments raises a hand, the others fade back.
+@Composable
+private fun ListenerStage(events: List<PersonaEvent>, position: () -> Double) {
+    val t = position()
+    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp)) {
+        for (persona in Persona.entries) {
+            val raised = events.any { it.persona == persona && it.activeAt(t) }
+            val alpha by animateFloatAsState(if (raised) 1f else 0.4f, MaterialTheme.motionSchemeEffects(), label = "stage")
+            Column(Modifier.weight(1f).alpha(alpha), horizontalAlignment = Alignment.CenterHorizontally) {
+                AnimatedListenerAvatar(persona, raised, Modifier.size(72.dp))
                 Text(
-                    stringResource(Res.string.results_listeners_count, fix.personas.size.toString()),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    personaLabel(persona),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (raised) FontWeight.Bold else FontWeight.Normal,
                 )
             }
-            Text("“${fix.quote}”", style = MaterialTheme.typography.bodyLarge)
-            Text(fix.events.first().fix, style = MaterialTheme.typography.titleSmall)
-            for (event in fix.events) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
-                    PersonaTag(event.persona)
-                    Text(event.reason, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+// Speech bubbles for the hand-raises active now, each with a tail pointing up at its listener on the stage.
+@Composable
+private fun Bubbles(events: List<PersonaEvent>, position: () -> Double) {
+    val t = position()
+    val active = events.filter { it.activeAt(t) }.distinctBy { it.persona to it.type }.sortedBy { it.persona.ordinal }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 20.dp).animateContentSize(MaterialTheme.motionSchemeSpatial())) {
+        val column = maxWidth / 3
+        Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            for (e in active) {
+                Box(Modifier.padding(top = 6.dp)) {
+                    Box(
+                        Modifier
+                            .offset(x = column * (e.persona.ordinal + 0.5f) - 7.dp, y = (-6).dp)
+                            .size(14.dp)
+                            .rotate(45f)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(3.dp)),
+                    )
+                    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                        val question = e.question
+                        Text(
+                            if (question != null) "“$question”" else e.reason,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            style = if (question != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (question != null) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+// Fix cards centered with the neighbors peeking, and dots that stretch into a pill for the current card.
 @Composable
-private fun QuestionCard(event: PersonaEvent, onSeek: (Double) -> Unit) {
-    Card(onClick = { onSeek(event.t) }, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                PersonaTag(event.persona)
-                Text(formatTime(event.t), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            }
-            Text(event.question.orEmpty(), style = MaterialTheme.typography.titleMedium)
-            Text(
-                "“${event.quote}”",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun FixPager(fixes: List<RankedFix>, segments: List<Segment>, pager: PagerState, onPick: (Int) -> Unit) {
+    val current = pager.currentPage
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 20.dp)) {
+        val cardWidth = minOf(maxWidth - 64.dp, 320.dp)
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = (maxWidth - cardWidth) / 2),
+            pageSpacing = 12.dp,
+        ) { page ->
+            FixCard(fixes[page], page, segments, isCurrent = page == current, onClick = { onPick(page) })
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.Center) {
+        fixes.indices.forEach { i ->
+            val width by animateDpAsState(if (i == current) 24.dp else 8.dp, MaterialTheme.motionSchemeFast(), label = "dot")
+            val pageLabel = stringResource(Res.string.results_fix_page, (i + 1).toString())
+            Box(
+                Modifier
+                    .padding(horizontal = 3.dp)
+                    .size(width = width, height = 8.dp)
+                    .background(
+                        if (i == current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+                        CircleShape,
+                    )
+                    .clickable(onClickLabel = pageLabel) { onPick(i) },
             )
         }
     }
 }
 
-// Every card is a hand that went up, so the listener is shown with a raised hand.
 @Composable
-private fun PersonaTag(persona: Persona) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        ListenerAvatar(persona, raise = { 1f }, modifier = Modifier.size(28.dp))
-        Text(personaLabel(persona), style = MaterialTheme.typography.labelMedium)
+private fun FixCard(fix: RankedFix, index: Int, segments: List<Segment>, isCurrent: Boolean, onClick: () -> Unit) {
+    // Show the hand-raise whose quote was spoken, not one quoting on-screen text, so the card reads as a sentence.
+    val first = fix.events.firstOrNull { e -> segments.any { e.quote in it.text } } ?: fix.events.first()
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(28.dp),
+        color = if (isCurrent) MaterialTheme.colorScheme.surfaceContainerLowest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                stringResource(Res.string.results_fix_title, (index + 1).toString(), formatTime(fix.t)),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 3.dp),
+            )
+            Text(highlighted(segments, first, ListenerColors.tint(first.persona)), style = MaterialTheme.typography.bodyLarge)
+            Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+            Text(
+                stringResource(Res.string.results_fix_how),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = ListenerColors.main(Persona.CLASSMATE),
+            )
+            Text(first.fix, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
-@Composable
-private fun EmptyHint(text: String) {
-    Text(
-        text,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-// Cold load only; same shapes as the loaded content so nothing jumps when it arrives.
-@Composable
-private fun ResultsSkeleton() {
-    val shade = MaterialTheme.colorScheme.surfaceVariant
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        for (h in listOf(112, 56, 40, 48, 140, 140)) {
-            Box(Modifier.fillMaxWidth().height(h.dp).background(shade, RoundedCornerShape(12.dp)))
+// The sentence around the hand-raise, with the quoted words marked in the listener's color.
+private fun highlighted(segments: List<Segment>, event: PersonaEvent, mark: Color): AnnotatedString {
+    val segment = segments.firstOrNull { event.t >= it.tStart && event.t < it.tEnd && event.quote in it.text }
+        ?: segments.firstOrNull { event.quote in it.text }
+    return buildAnnotatedString {
+        if (segment == null) {
+            withStyle(SpanStyle(background = mark)) { append(event.quote) }
+            return@buildAnnotatedString
         }
+        val start = segment.text.indexOf(event.quote)
+        append(segment.text.substring(0, start))
+        withStyle(SpanStyle(background = mark)) { append(event.quote) }
+        append(segment.text.substring(start + event.quote.length))
     }
 }
 
@@ -300,9 +503,6 @@ private fun ResultsError(onRetry: () -> Unit) {
         Button(onClick = onRetry) { Text(stringResource(Res.string.results_retry)) }
     }
 }
-
-// The approved listener colors (fixed, not themed), so a pin's color names the same listener as its avatar.
-internal fun personaColor(persona: Persona): Color = ListenerColors.main(persona)
 
 @Composable
 internal fun personaLabel(persona: Persona): String = stringResource(

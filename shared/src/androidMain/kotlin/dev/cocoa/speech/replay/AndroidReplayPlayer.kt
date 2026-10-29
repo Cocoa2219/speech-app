@@ -3,12 +3,13 @@ package dev.cocoa.speech.replay
 import android.content.Context
 import android.media.MediaPlayer
 import android.widget.VideoView
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +17,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,26 +51,43 @@ fun AndroidReplayPlayer(media: ReplayMedia, seek: SeekRequest?, onPosition: (Dou
     LaunchedEffect(player, seek) {
         seek?.let { player.seekTo((it.t * 1000).toInt()) }
     }
+    // Report the position only while playing, so opening the screen (which seeks to the first fix) is not reset to 0.
     LaunchedEffect(player, playing) {
         while (playing) {
             onPosition(player.positionMs() / 1000.0)
             delay(100)
         }
-        onPosition(player.positionMs() / 1000.0)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Fills the results screen's dark replay area; a small play/pause button sits in the corner.
+    Box(Modifier.fillMaxSize()) {
         if (player is VideoPlayer) {
-            AndroidView(factory = { player.view }, modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp))
+            AndroidView(factory = { player.view }, modifier = Modifier.fillMaxSize())
         }
-        OutlinedButton(
+        val label = stringResource(if (playing) Res.string.results_pause else Res.string.results_play)
+        FilledIconButton(
             onClick = {
                 if (playing) player.pause() else player.play()
                 playing = !playing
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(48.dp).semantics { contentDescription = label },
+            colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White.copy(alpha = 0.92f)),
         ) {
-            Text(stringResource(if (playing) Res.string.results_pause else Res.string.results_play))
+            PlayPauseGlyph(playing)
+        }
+    }
+}
+
+@Composable
+private fun PlayPauseGlyph(playing: Boolean) {
+    val ink = Color(0xFF1E2329)
+    Canvas(Modifier.size(18.dp)) {
+        val w = size.width
+        if (playing) {
+            drawRoundRect(ink, Offset(w * 0.18f, 0f), Size(w * 0.22f, w), CornerRadius(w * 0.06f))
+            drawRoundRect(ink, Offset(w * 0.60f, 0f), Size(w * 0.22f, w), CornerRadius(w * 0.06f))
+        } else {
+            drawPath(Path().apply { moveTo(w * 0.2f, 0f); lineTo(w, w / 2); lineTo(w * 0.2f, w); close() }, ink)
         }
     }
 }

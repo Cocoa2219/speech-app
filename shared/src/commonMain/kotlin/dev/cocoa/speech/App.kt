@@ -1,6 +1,5 @@
 package dev.cocoa.speech
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +22,7 @@ import dev.cocoa.speech.results.ResultsRoute
 import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.SetupRoute
+import dev.cocoa.speech.theme.AppTheme
 import kotlinx.coroutines.launch
 
 // A camera record screen supplied by the platform (Android: CameraX in androidMain).
@@ -54,7 +54,7 @@ private sealed interface Screen {
 
 @Composable
 fun App(gradeStore: GradeStore, live: LiveDeps?, backHandler: BackHandlerSlot = { _, _ -> }) {
-    MaterialTheme {
+    AppTheme {
         Surface {
             // A handful of screens; a navigation library can wait. Recording bytes and reports are not saveable,
             // so this is plain remember (the activity handles configuration changes itself).

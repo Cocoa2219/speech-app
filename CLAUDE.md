@@ -56,8 +56,11 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
       question.
 5. **Merge and rank**: dedupe, rank fixes by how many listeners they help. Pace, pause, and filler strip comes from
    transcript timing; it is descriptive only.
-6. **Results screen**: replay with synced pins, heatmap bar, pace strip, tabs "Fixes (top 3)" and "Questions your
-   listeners would ask".
+6. **Results screen** (designed on the "Listener characters" canvas, board D; M3 Expressive theme and motion): replay
+   on top with a subtitle; a draggable scrubber with listener-colored marks, showing a small pill (time + faces) while
+   dragging; the listener stage (hands rise while playback is at their moments); speech bubbles with the reason or the
+   kid's question; a centered pager of the top 3 fixes (choosing one seeks to it). No separate questions tab, heatmap,
+   or pace strip on this screen (pace data stays in `ResultsReport`).
 
 ## Transcription notes (verify on Day 1)
 
