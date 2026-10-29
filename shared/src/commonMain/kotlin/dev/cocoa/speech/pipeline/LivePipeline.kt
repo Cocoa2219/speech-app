@@ -1,11 +1,11 @@
 package dev.cocoa.speech.pipeline
 
-import dev.cocoa.speech.gemini.GeminiClient
+import dev.cocoa.speech.gemini.JsonGenerator
 import dev.cocoa.speech.logic.PromptTemplate
 import speech_app.shared.generated.resources.Res
 
 // Builds an AnalysisRun for one recording, with prompts read from composeResources/files/prompts.
-class LivePipeline(private val client: GeminiClient) {
+class LivePipeline(private val client: JsonGenerator) {
     suspend fun newRun(audio: ByteArray, mimeType: String, durationSeconds: Double, grade: String): AnalysisRun =
         AnalysisRun(
             audio = audio,

@@ -103,6 +103,16 @@ class GeminiClientTest {
     }
 
     @Test
+    fun reportsTokenUsage() = runTest {
+        val usage = mutableListOf<UsageMetadata>()
+        val body = """{"candidates":[{"content":{"parts":[{"text":"{}"}]},"finishReason":"STOP"}],
+            "usageMetadata":{"promptTokenCount":2400,"candidatesTokenCount":300,"thoughtsTokenCount":900,"totalTokenCount":3600}}"""
+        val client = GeminiClient("k", HttpClient(MockEngine { respond(body, HttpStatusCode.OK, jsonHeaders) }), onUsage = usage::add)
+        client.generateJson("m", "sys", emptyList(), schema)
+        assertEquals(listOf(UsageMetadata(2400, 300, 900, 3600)), usage)
+    }
+
+    @Test
     fun overloadIsRetriedThenSucceeds() = runTest {
         var calls = 0
         val client = GeminiClient("k", HttpClient(MockEngine {

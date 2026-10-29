@@ -167,6 +167,16 @@ Run from the repo root (Git Bash or PowerShell). `local.properties` (gitignored)
   `adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk` then
   `adb shell am start -n dev.cocoa.speech/.MainActivity`
 
+Debug builds only (the API key is on the free tier, 20 requests per day; one run is 3 requests, or 5 with
+`PipelineConfig.PARALLEL_PERSONA_CALLS`):
+
+- Analyze a WAV instead of the microphone: `adb push sample.wav /data/local/tmp/` then
+  `adb shell run-as dev.cocoa.speech cp /data/local/tmp/sample.wav files/sample.wav`, and tap "샘플 파일로 분석 (디버그)".
+- Model answers are cached on the device by request hash (`CachingGenerator`), so rerunning the same input spends no
+  requests; a changed prompt re-spends only the stages it affects. Clear with
+  `adb shell run-as dev.cocoa.speech rm -r files/gemini-cache`.
+- Token counts per call are logged as `GeminiUsage:` (counts only). Watch with `adb logcat System.out:I *:S`.
+
 Test results land in `shared/build/test-results/`. In Git Bash, set `MSYS_NO_PATHCONV=1` before `adb shell` commands
 that take device paths like `/sdcard/...`, or Git Bash rewrites them.
 

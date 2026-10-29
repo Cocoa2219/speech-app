@@ -2,13 +2,14 @@ package dev.cocoa.speech.pipeline
 
 import dev.cocoa.speech.GeminiModels
 import dev.cocoa.speech.gemini.GeminiClient
+import dev.cocoa.speech.gemini.JsonGenerator
 import dev.cocoa.speech.model.AppJson
 import dev.cocoa.speech.model.Segment
 import kotlinx.serialization.Serializable
 
 // Audio -> transcript segments with times in seconds. The model returns MM:SS strings (the format the Gemini audio
 // docs use for timestamps); code converts them, so a malformed time drops one segment instead of the whole stage.
-class Transcriber(private val client: GeminiClient, private val prompt: String) {
+class Transcriber(private val client: JsonGenerator, private val prompt: String) {
     suspend fun transcribe(audio: ByteArray, mimeType: String): List<Segment> {
         val json = client.generateJson(
             model = GeminiModels.TRANSCRIBE,

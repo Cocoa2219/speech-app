@@ -32,7 +32,9 @@ class GeminiClient(
     http: HttpClient,
     private val baseUrl: String = "https://generativelanguage.googleapis.com/v1beta",
     requestTimeoutMillis: Long = REQUEST_TIMEOUT_MS,
-) {
+    // Called with token counts after each successful call. Counts only; never request or response text.
+    private val onUsage: (UsageMetadata) -> Unit = {},
+) : JsonGenerator {
     // Explicit timeouts: OkHttp's default 10 s read timeout is far below observed generation latency
     // (gemini-3.8-flash took ~48 s for a one-line prompt on 2026-10-29). A timeout surfaces as a retryable stage failure.
     private val http = http.config {
@@ -51,12 +53,12 @@ class GeminiClient(
     enum class Thinking { LOW, MEDIUM, HIGH }
 
     // Returns the model's JSON text. Throws GeminiException on HTTP errors, blocked prompts, or empty output.
-    suspend fun generateJson(
+    override suspend fun generateJson(
         model: String,
         systemInstruction: String,
         parts: List<Part>,
         schema: JsonObject,
-        thinking: Thinking = Thinking.LOW,
+        thinking: Thinking,
     ): String {
         val requestJson = requestBody(systemInstruction, parts, schema, thinking).toString()
         // Overload errors (429/500/503) were common in testing on 2026-10-29; retry them a few times before the stage
@@ -83,7 +85,9 @@ class GeminiClient(
             val error = runCatching { AppJson.decodeFromString<ErrorEnvelope>(body).error }.getOrNull()
             throw GeminiException(response.status.value, error?.status, error?.message ?: "HTTP ${response.status.value}")
         }
-        return extractText(AppJson.decodeFromString<GenerateContentResponse>(body))
+        val decoded = AppJson.decodeFromString<GenerateContentResponse>(body)
+        decoded.usageMetadata?.let(onUsage)
+        return extractText(decoded)
     }
 
     companion object {
@@ -143,6 +147,7 @@ class GeminiException(val httpStatus: Int, val reason: String?, message: String)
 data class GenerateContentResponse(
     val candidates: List<Candidate> = emptyList(),
     val promptFeedback: PromptFeedback? = null,
+    val usageMetadata: UsageMetadata? = null,
 ) {
     @Serializable
     data class Candidate(val content: Content? = null, val finishReason: String? = null)
@@ -162,3 +167,13 @@ private data class ErrorEnvelope(val error: ErrorBody? = null) {
     @Serializable
     data class ErrorBody(val code: Int? = null, val message: String? = null, val status: String? = null)
 }
+
+// Token counts from usageMetadata (field names verified against https://ai.google.dev/api/generate-content on
+// 2026-10-29). Thinking tokens are billed as output, so output cost = candidates + thoughts.
+@Serializable
+data class UsageMetadata(
+    val promptTokenCount: Int = 0,
+    val candidatesTokenCount: Int = 0,
+    val thoughtsTokenCount: Int = 0,
+    val totalTokenCount: Int = 0,
+)

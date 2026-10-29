@@ -2,12 +2,16 @@ package dev.cocoa.speech.pipeline
 
 import dev.cocoa.speech.GeminiModels
 import dev.cocoa.speech.gemini.GeminiClient
+import dev.cocoa.speech.gemini.JsonGenerator
 import dev.cocoa.speech.logic.PersonaTrigger
 import dev.cocoa.speech.model.AppJson
 import dev.cocoa.speech.model.EventType
 import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.model.PersonaEvent
 import dev.cocoa.speech.model.Segment
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -16,27 +20,40 @@ import kotlinx.serialization.json.putJsonArray
 
 // Writes reason, fix, and the kid's question for triggers that PersonaRules already placed. The model cannot add or
 // move a hand-raise: persona, time, type, and quote always come from the trigger.
+// parallel: one call per persona, run at once. Output length drives latency (one call for 17 triggers took ~22 s),
+// but it costs 3 requests instead of 1 against the daily request limit. See PipelineConfig.
 class PersonaWriter(
-    private val client: GeminiClient,
+    private val client: JsonGenerator,
     private val prompt: String,
+    private val parallel: Boolean = PipelineConfig.PARALLEL_PERSONA_CALLS,
     private val log: (String) -> Unit = ::println,
 ) {
     suspend fun write(segments: List<Segment>, triggers: List<PersonaTrigger>): List<PersonaEvent> {
-        if (triggers.isEmpty()) return emptyList()
+        val indexed = triggers.withIndex().toList()
+        val groups = if (parallel) indexed.groupBy { it.value.persona }.values else listOf(indexed).filter { it.isNotEmpty() }
+        val items = coroutineScope {
+            groups.map { group -> async { writeGroup(segments, group) } }.awaitAll().flatten()
+        }
+        return events(triggers, items, log)
+    }
+
+    // Indexes stay global so events() can pair text with triggers; items for indexes outside the group are ignored.
+    private suspend fun writeGroup(segments: List<Segment>, group: List<IndexedValue<PersonaTrigger>>): List<PersonaDto.Item> {
         val json = client.generateJson(
             model = GeminiModels.PERSONA,
             systemInstruction = prompt,
-            parts = listOf(GeminiClient.Part.Text(input(segments, triggers))),
+            parts = listOf(GeminiClient.Part.Text(input(segments, group))),
             schema = Schemas.persona,
         )
-        return events(triggers, AppJson.decodeFromString<PersonaDto>(json).items, log)
+        val indexes = group.map { it.index }.toSet()
+        return AppJson.decodeFromString<PersonaDto>(json).items.filter { it.index in indexes }
     }
 
     companion object {
-        fun input(segments: List<Segment>, triggers: List<PersonaTrigger>): String = buildJsonObject {
+        fun input(segments: List<Segment>, triggers: List<IndexedValue<PersonaTrigger>>): String = buildJsonObject {
             put("segments", Analyzer.segmentsJson(segments))
             putJsonArray("triggers") {
-                triggers.forEachIndexed { i, trigger ->
+                for ((i, trigger) in triggers) {
                     addJsonObject {
                         put("index", i)
                         put("persona", trigger.persona.name.lowercase())

@@ -87,11 +87,12 @@ class PersonaWriterTest {
 
     @Test
     fun inputNumbersTriggersAndUsesContractNames() {
-        val input = Json.parseToJsonElement(PersonaWriter.input(emptyList(), triggers)).jsonObject
-        val first = input.getValue("triggers").jsonArray[0].jsonObject
-        assertEquals(0, first.getValue("index").jsonPrimitive.content.toInt())
-        assertEquals("classmate", first.getValue("persona").jsonPrimitive.content)
-        assertEquals("undefined_term", first.getValue("type").jsonPrimitive.content)
+        val kidOnly = triggers.withIndex().filter { it.value.persona == Persona.KID }
+        val input = Json.parseToJsonElement(PersonaWriter.input(emptyList(), kidOnly)).jsonObject
+        val first = input.getValue("triggers").jsonArray.single().jsonObject
+        assertEquals(2, first.getValue("index").jsonPrimitive.content.toInt()) // global index, not position in group
+        assertEquals("kid", first.getValue("persona").jsonPrimitive.content)
+        assertEquals("why_question", first.getValue("type").jsonPrimitive.content)
     }
 }
 
@@ -119,7 +120,12 @@ class AnalysisRunTest {
         """{"candidates":[{"content":{"parts":[{"text":${JsonPrimitive(text)}}]},"finishReason":"STOP"}]}"""
 
     // Answers by system prompt; fails the analyzer on the attempts listed in failAnalyze.
-    private fun run(calls: MutableList<String>, failAnalyze: Set<Int> = emptySet(), transcriptBody: String = transcript): AnalysisRun {
+    private fun run(
+        calls: MutableList<String>,
+        failAnalyze: Set<Int> = emptySet(),
+        transcriptBody: String = transcript,
+        parallel: Boolean = false,
+    ): AnalysisRun {
         var analyzeAttempts = 0
         val engine = MockEngine { request ->
             val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
@@ -143,7 +149,7 @@ class AnalysisRunTest {
             mimeType = "audio/aac",
             transcriber = Transcriber(client, "T"),
             analyzer = Analyzer(client, "A"),
-            writer = PersonaWriter(client, "W", log = {}),
+            writer = PersonaWriter(client, "W", parallel = parallel, log = {}),
             log = {},
         )
     }
@@ -152,14 +158,25 @@ class AnalysisRunTest {
     fun runsAllStagesIntoAReport() = runTest {
         val calls = mutableListOf<String>()
         val stages = mutableListOf<Stage>()
-        val report = run(calls).run(stages::add)
+        val report = run(calls, parallel = true).run(stages::add)
 
         assertEquals(listOf(Stage.TRANSCRIBE, Stage.ANALYZE, Stage.WRITE), stages)
+        assertEquals(3, calls.count { it == "W" }) // one writer call per persona
         assertEquals(2, report.segments.size)
+        // The fake writer answers every call with all three items; each call keeps only its own, so no duplicates.
         assertEquals(3, report.events.size)
+        assertEquals(listOf("광합성이 뭔지 몰라요", "근거가 없어요", "이유가 궁금해요"), report.events.map { it.reason })
         assertEquals(listOf("왜 자라?"), report.questions.map { it.question })
         // Teacher and kid flag the same claim, so it ranks first as the fix that helps the most listeners.
         assertEquals("그래서 식물은 자라요", report.topFixes.first().quote)
+    }
+
+    @Test
+    fun singleWriterCallGivesTheSameEvents() = runTest {
+        val calls = mutableListOf<String>()
+        val report = run(calls, parallel = false).run {}
+        assertEquals(1, calls.count { it == "W" })
+        assertEquals(listOf("광합성이 뭔지 몰라요", "근거가 없어요", "이유가 궁금해요"), report.events.map { it.reason })
     }
 
     @Test

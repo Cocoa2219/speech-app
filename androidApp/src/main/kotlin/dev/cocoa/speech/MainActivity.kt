@@ -28,7 +28,9 @@ class MainActivity : ComponentActivity() {
         val live = if (apiKey.isBlank()) null else LiveDeps(
             recorder = AndroidAudioRecorder(applicationContext),
             permission = ActivityMicPermission(this),
-            pipeline = LivePipeline(createGeminiClient(apiKey)),
+            pipeline = LivePipeline(
+                createGeminiClient(apiKey, cacheDir = if (BuildConfig.DEBUG) File(filesDir, "gemini-cache") else null),
+            ),
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
         )
         setContent {

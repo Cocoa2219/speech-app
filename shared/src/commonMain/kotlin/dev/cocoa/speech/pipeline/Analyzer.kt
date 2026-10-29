@@ -2,6 +2,7 @@ package dev.cocoa.speech.pipeline
 
 import dev.cocoa.speech.GeminiModels
 import dev.cocoa.speech.gemini.GeminiClient
+import dev.cocoa.speech.gemini.JsonGenerator
 import dev.cocoa.speech.model.AnalyzerOutput
 import dev.cocoa.speech.model.AppJson
 import dev.cocoa.speech.model.Segment
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.put
 
 // Transcript -> neutral analysis (prompts/analyzer.md, already filled with grade and duration).
 // Audio only for now: no scene timeline is sent, so visual and mismatches come back empty.
-class Analyzer(private val client: GeminiClient, private val prompt: String) {
+class Analyzer(private val client: JsonGenerator, private val prompt: String) {
     suspend fun analyze(segments: List<Segment>): AnalyzerOutput {
         val json = client.generateJson(
             model = GeminiModels.ANALYZER,
