@@ -28,6 +28,7 @@
     <string name="processing_title">분석 중</string>
     <string name="processing_hint">녹음 길이에 따라 1분 정도 걸릴 수 있어요.</string>
     <string name="stage_transcribe">말한 내용 받아쓰기</string>
+    <string name="stage_video">화면 내용 보기</string>
     <string name="stage_analyze">설명 분석하기</string>
     <string name="stage_write">청중 반응 쓰기</string>
     <string name="stage_done">완료</string>
@@ -41,6 +42,7 @@
     <string name="results_back">설정으로</string>
     <string name="results_grade_basis">%1$s 기준</string>
     <string name="results_mock_badge">예시 데이터</string>
+    <string name="results_video_failed">영상 분석에 실패해서 소리만으로 분석했어요.</string>
     <string name="results_no_replay">다시 듣기는 아직 준비 중이에요. 대본으로 보여 줘요.</string>
     <string name="results_no_recording">녹화 영상이 아직 없어요. 예시 대본으로 보여 줘요.</string>
     <string name="results_timeline_label">청중이 헷갈린 지점</string>

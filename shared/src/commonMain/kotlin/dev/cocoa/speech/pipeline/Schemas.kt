@@ -15,7 +15,8 @@ object Schemas {
         "segments" to array(obj("start" to string(), "end" to string(), "text" to string())),
     )
 
-    // AnalyzerOutput without `segments`: code keeps the transcript, the model does not echo it.
+    // AnalyzerOutput without `segments` and `visual`: code keeps the transcript and scene timeline; the model does not
+    // echo them.
     val analyzer: JsonObject = obj(
         "terms" to array(
             obj(
@@ -33,7 +34,6 @@ object Schemas {
                 "evidence_on_screen" to string(nullable = true),
             ),
         ),
-        "visual" to array(obj("t" to number(), "summary" to string(), "slide_index" to integer(nullable = true))),
         "mismatches" to array(
             obj(
                 "t" to number(),
@@ -53,6 +53,18 @@ object Schemas {
                         "stated_quote" to string(nullable = true),
                     ),
                 ),
+            ),
+        ),
+    )
+
+    val video: JsonObject = obj(
+        "scenes" to array(
+            obj(
+                "t" to string(),
+                "summary" to string(),
+                "on_screen_text" to string(nullable = true),
+                "slide_index" to integer(nullable = true),
+                "pointing_at" to string(nullable = true),
             ),
         ),
     )

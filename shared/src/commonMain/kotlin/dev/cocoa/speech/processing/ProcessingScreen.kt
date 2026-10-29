@@ -45,6 +45,7 @@ import speech_app.shared.generated.resources.stage_analyze
 import speech_app.shared.generated.resources.stage_done
 import speech_app.shared.generated.resources.stage_failed
 import speech_app.shared.generated.resources.stage_transcribe
+import speech_app.shared.generated.resources.stage_video
 import speech_app.shared.generated.resources.stage_write
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -52,6 +53,7 @@ import kotlin.coroutines.cancellation.CancellationException
 // failed stage. createRun reads the prompts; if that fails it is reported as a transcription failure and retried.
 @Composable
 fun ProcessingRoute(
+    stages: List<Stage>,
     createRun: suspend () -> AnalysisRun,
     onDone: (ResultsReport) -> Unit,
     onRerecord: () -> Unit,
@@ -77,6 +79,7 @@ fun ProcessingRoute(
     }
 
     ProcessingScreen(
+        stages = stages,
         current = current,
         failure = failure,
         onRetry = { attempt++ },
@@ -87,6 +90,7 @@ fun ProcessingRoute(
 
 @Composable
 fun ProcessingScreen(
+    stages: List<Stage>,
     current: Stage,
     failure: StageFailure?,
     onRetry: () -> Unit,
@@ -103,7 +107,7 @@ fun ProcessingScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        for (stage in Stage.entries) {
+        for (stage in stages) {
             StageRow(stage, current, failed = failure != null && stage == current)
         }
         if (failure != null) {
@@ -157,6 +161,7 @@ private fun StageRow(stage: Stage, current: Stage, failed: Boolean) {
 
 private fun stageLabel(stage: Stage) = when (stage) {
     Stage.TRANSCRIBE -> Res.string.stage_transcribe
+    Stage.VIDEO -> Res.string.stage_video
     Stage.ANALYZE -> Res.string.stage_analyze
     Stage.WRITE -> Res.string.stage_write
 }

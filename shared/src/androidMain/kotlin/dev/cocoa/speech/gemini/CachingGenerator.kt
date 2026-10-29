@@ -58,6 +58,8 @@ class CachingGenerator(
                 field(("media:" + part.mimeType).toByteArray())
                 field(part.bytes)
             }
+            // Each upload gets a new URI, so uploaded files (video) never hit the cache.
+            is GeminiClient.Part.FileRef -> field(("file:" + part.mimeType + ":" + part.uri).toByteArray())
         }
         field(schema.toString().toByteArray())
         field(thinking.name.toByteArray())

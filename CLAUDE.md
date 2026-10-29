@@ -33,11 +33,14 @@ Android + Kotlin Multiplatform shell. Do not sink time into polish before the Da
 1. **Record**: rear camera, up to 3 min (soft warning 2:30, auto-stop 3:00), minimum 20-30 s, pause supported. Compress
    video on device. Extract the audio track separately. Implemented: microphone-only (`AndroidAudioRecorder`) and
    camera (`CameraCapture`, CameraX at SD quality, 1 Mbps; the AAC track is copied out to `.m4a` without re-encoding).
-   Camera recordings currently feed only their audio to Layer 1 and the video file is deleted. For Layer 2, 3 minutes
-   of video is ~23 MB, over the 20 MB inline request limit, so video needs the Files API.
+   3 minutes of video is ~23 MB, over the 20 MB inline request limit, so video goes through the Files API
+   (`GeminiFiles`: upload, wait for ACTIVE, use, then DELETE in a `finally`). The local video file lives only until its
+   run ends.
 2. **In parallel**
     - Audio -> transcript with timestamps (Korean, ko-KR; handle Korean-English mixing).
-    - Video -> scene timeline (what is on screen, slide changes, pointing, MM:SS).
+    - Video -> scene timeline (what is on screen, slide changes, pointing, MM:SS). Prompt `prompts/video.md`;
+      `SceneDescriber` turns each scene into a `Visual` whose summary carries the on-screen text verbatim, so screen
+      quotes can be grounded. If video fails, the run continues audio-only and `ResultsReport.video` is `FAILED`.
 3. **Merge by time**, then run the **neutral analyzer** (no role-play, prompt `prompts/analyzer.md`): terms with a
    difficulty label (everyday / school / specialist), claims and their reasons, said-vs-shown mismatches, and `steps`
    (conclusions with the premises they depend on). For `steps` the analyzer lists only premises a listener at the

@@ -1,6 +1,10 @@
 package dev.cocoa.speech.pipeline
 
 import dev.cocoa.speech.gemini.GeminiClient
+import dev.cocoa.speech.gemini.GeminiException
+import dev.cocoa.speech.gemini.MediaUploader
+import dev.cocoa.speech.logic.VideoStatus
+import dev.cocoa.speech.record.VideoInput
 import dev.cocoa.speech.logic.PersonaTrigger
 import dev.cocoa.speech.model.EventType
 import dev.cocoa.speech.model.Persona
@@ -20,6 +24,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -98,9 +103,42 @@ class PersonaWriterTest {
 
 class SchemasTest {
     @Test
-    fun analyzerSchemaRequiresEveryFieldButSegments() {
+    fun analyzerSchemaRequiresEveryFieldButSegmentsAndVisual() {
         val required = Schemas.analyzer.getValue("required").jsonArray.map { it.jsonPrimitive.content }
-        assertEquals(listOf("terms", "claims", "visual", "mismatches", "steps"), required)
+        assertEquals(listOf("terms", "claims", "mismatches", "steps"), required)
+    }
+}
+
+class SceneDescriberTest {
+    @Test
+    fun toScenesParsesTimesDropsBadRowsAndSorts() {
+        val scenes = SceneDescriber.toScenes(
+            SceneDto(
+                listOf(
+                    SceneDto.Item("00:20.5", "Slide 2", onScreenText = " 명반응 / 암반응 ", slideIndex = 2),
+                    SceneDto.Item("??", "dropped"),
+                    SceneDto.Item("00:03", "Title slide", onScreenText = "", slideIndex = 1, pointingAt = " "),
+                ),
+            ),
+        )
+        assertEquals(listOf(3.0, 20.5), scenes.map { it.t })
+        assertNull(scenes[0].onScreenText) // blank text becomes null
+        assertNull(scenes[0].pointingAt)
+        assertEquals("명반응 / 암반응", scenes[1].onScreenText)
+    }
+
+    @Test
+    fun visualSummaryCarriesOnScreenTextSoScreenQuotesCanBeGrounded() {
+        val visual = Scene(20.5, "Slide 2", onScreenText = "명반응 / 암반응", slideIndex = 2, pointingAt = "diagram").toVisual()
+        assertEquals("Slide 2 On screen: \"명반응 / 암반응\" Pointing at: diagram", visual.summary)
+        assertEquals(2, visual.slideIndex)
+    }
+
+    @Test
+    fun analyzerInputIncludesScenesOnlyWhenThereAreAny() {
+        assertFalse("scenes" in Json.parseToJsonElement(Analyzer.input(emptyList())).jsonObject)
+        val withScenes = Json.parseToJsonElement(Analyzer.input(emptyList(), listOf(Scene(1.0, "s", "글자")))).jsonObject
+        assertEquals("글자", withScenes.getValue("scenes").jsonArray[0].jsonObject.getValue("on_screen_text").jsonPrimitive.content)
     }
 }
 
@@ -110,11 +148,23 @@ class AnalysisRunTest {
         {"start":"00:05","end":"00:09","text":"그래서 식물은 자라요"}]}"""
     private val analysis = """{"terms":[{"term":"광합성","t":0.0,"level":"school","defined_at":null}],
         "claims":[{"t":5.0,"text":"그래서 식물은 자라요","has_reason":false,"evidence_on_screen":null}],
-        "visual":[],"mismatches":[],"steps":[]}"""
+        "mismatches":[{"t":5.0,"type":"shown_not_said","quote":"광합성 공식"}],"steps":[]}"""
     private val writing = """{"items":[
         {"index":0,"reason":"광합성이 뭔지 몰라요","fix":"광합성의 뜻을 먼저 말해 주세요","question":null},
         {"index":1,"reason":"근거가 없어요","fix":"왜 자라는지 덧붙여요","question":null},
         {"index":2,"reason":"이유가 궁금해요","fix":"이유를 말해 주세요","question":"왜 자라?"}]}"""
+
+    private val sceneJson = """{"scenes":[{"t":"00:01","summary":"Title slide","on_screen_text":"광합성 공식","slide_index":1,"pointing_at":null}]}"""
+
+    // Hands the bytes back as a file reference; records whether the upload was used and released.
+    private class FakeUploader(val fail: Boolean = false) : MediaUploader {
+        var uploads = 0
+        override suspend fun <T> withUploaded(bytes: ByteArray, mimeType: String, block: suspend (GeminiClient.Part.FileRef) -> T): T {
+            uploads++
+            if (fail) throw GeminiException(200, "FAILED", "File processing failed")
+            return block(GeminiClient.Part.FileRef(mimeType, "files/fake"))
+        }
+    }
 
     private fun envelope(text: String) =
         """{"candidates":[{"content":{"parts":[{"text":${JsonPrimitive(text)}}]},"finishReason":"STOP"}]}"""
@@ -125,6 +175,8 @@ class AnalysisRunTest {
         failAnalyze: Set<Int> = emptySet(),
         transcriptBody: String = transcript,
         parallel: Boolean = false,
+        uploader: FakeUploader? = null,
+        analyzerInputs: MutableList<String> = mutableListOf(),
     ): AnalysisRun {
         var analyzeAttempts = 0
         val engine = MockEngine { request ->
@@ -135,10 +187,15 @@ class AnalysisRunTest {
             val headers = headersOf(HttpHeaders.ContentType, "application/json")
             when (prompt) {
                 "T" -> respond(envelope(transcriptBody), HttpStatusCode.OK, headers)
-                "A" -> if (analyzeAttempts++ in failAnalyze) {
-                    respond("""{"error":{"code":400,"message":"bad","status":"INVALID_ARGUMENT"}}""", HttpStatusCode.BadRequest, headers)
-                } else {
-                    respond(envelope(analysis), HttpStatusCode.OK, headers)
+                "V" -> respond(envelope(sceneJson), HttpStatusCode.OK, headers)
+                "A" -> {
+                    val parts = body.getValue("contents").jsonArray[0].jsonObject.getValue("parts").jsonArray
+                    analyzerInputs += parts[0].jsonObject.getValue("text").jsonPrimitive.content
+                    if (analyzeAttempts++ in failAnalyze) {
+                        respond("""{"error":{"code":400,"message":"bad","status":"INVALID_ARGUMENT"}}""", HttpStatusCode.BadRequest, headers)
+                    } else {
+                        respond(envelope(analysis), HttpStatusCode.OK, headers)
+                    }
                 }
                 else -> respond(envelope(writing), HttpStatusCode.OK, headers)
             }
@@ -150,6 +207,8 @@ class AnalysisRunTest {
             transcriber = Transcriber(client, "T"),
             analyzer = Analyzer(client, "A"),
             writer = PersonaWriter(client, "W", parallel = parallel, log = {}),
+            video = uploader?.let { VideoInput("video/mp4", read = { byteArrayOf(9) }, discard = {}) },
+            describer = uploader?.let { SceneDescriber(client, it, "V") },
             log = {},
         )
     }
@@ -198,5 +257,47 @@ class AnalysisRunTest {
         val failure = assertFailsWith<StageFailure> { run(mutableListOf(), transcriptBody = """{"segments":[]}""").run {} }
         assertEquals(Stage.TRANSCRIBE, failure.stage)
         assertTrue(failure.noSpeech)
+    }
+
+    @Test
+    fun audioOnlyRunHasNoVideoStageOrMismatches() = runTest {
+        val pipeline = run(mutableListOf())
+        assertEquals(listOf(Stage.TRANSCRIBE, Stage.ANALYZE, Stage.WRITE), pipeline.stages)
+        val report = pipeline.run {}
+        assertEquals(VideoStatus.NONE, report.video)
+        assertTrue(report.visual.isEmpty())
+    }
+
+    @Test
+    fun videoScenesReachTheAnalyzerAndTheReport() = runTest {
+        val calls = mutableListOf<String>()
+        val inputs = mutableListOf<String>()
+        val uploader = FakeUploader()
+        val pipeline = run(calls, uploader = uploader, analyzerInputs = inputs)
+        val stages = mutableListOf<Stage>()
+        val report = pipeline.run(stages::add)
+
+        assertEquals(listOf(Stage.TRANSCRIBE, Stage.VIDEO, Stage.ANALYZE, Stage.WRITE), stages)
+        assertEquals(1, uploader.uploads)
+        assertTrue("광합성 공식" in inputs.single()) // the scene timeline is in the analyzer's input
+        assertEquals(VideoStatus.USED, report.video)
+        assertEquals(1, report.visual.size)
+        assertTrue("광합성 공식" in report.visual.single().summary)
+    }
+
+    @Test
+    fun videoFailureFallsBackToAudioOnlyAndIsNotRetried() = runTest {
+        val calls = mutableListOf<String>()
+        val inputs = mutableListOf<String>()
+        val uploader = FakeUploader(fail = true)
+        val pipeline = run(calls, failAnalyze = setOf(0), uploader = uploader, analyzerInputs = inputs)
+
+        assertFailsWith<StageFailure> { pipeline.run {} } // the analyzer fails once, unrelated to video
+        val report = pipeline.run {}
+
+        assertEquals(VideoStatus.FAILED, report.video)
+        assertEquals(1, uploader.uploads) // a failed video is not uploaded again on retry
+        assertTrue(inputs.none { "scenes" in it }) // the analyzer ran audio-only
+        assertTrue(report.visual.isEmpty())
     }
 }

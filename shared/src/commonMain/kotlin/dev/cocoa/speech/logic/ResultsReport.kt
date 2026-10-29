@@ -4,6 +4,11 @@ import dev.cocoa.speech.model.AnalyzerOutput
 import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.model.PersonaEvent
 import dev.cocoa.speech.model.Segment
+import dev.cocoa.speech.model.Visual
+
+// Whether the scene timeline from video fed this report. FAILED means video was recorded but its analysis failed and
+// the results are audio-only (CLAUDE.md failure handling); the UI should say so.
+enum class VideoStatus { NONE, USED, FAILED }
 
 // Everything the results screen shows, computed once from analyzer output and persona events.
 data class ResultsReport(
@@ -14,6 +19,8 @@ data class ResultsReport(
     val questions: List<PersonaEvent>,
     val heatmap: List<Int>,
     val pace: PaceStrip,
+    val visual: List<Visual> = emptyList(),
+    val video: VideoStatus = VideoStatus.NONE,
 ) {
     val topFixes: List<RankedFix> get() = fixes.take(TOP_FIXES)
 
@@ -22,7 +29,7 @@ data class ResultsReport(
         const val HEATMAP_BINS = 30
 
         // Ungrounded events are dropped here, so nothing downstream can show a hand-raise without evidence.
-        fun build(analyzer: AnalyzerOutput, events: List<PersonaEvent>): ResultsReport {
+        fun build(analyzer: AnalyzerOutput, events: List<PersonaEvent>, video: VideoStatus = VideoStatus.NONE): ResultsReport {
             val grounded = FixRanking.dedupe(QuoteValidator(analyzer).filter(events)).sortedBy { it.t }
             val duration = analyzer.segments.maxOfOrNull { it.tEnd } ?: 0.0
             return ResultsReport(
@@ -33,6 +40,8 @@ data class ResultsReport(
                 questions = grounded.filter { it.persona == Persona.KID && !it.question.isNullOrBlank() },
                 heatmap = FixRanking.heatmap(grounded, duration, HEATMAP_BINS),
                 pace = PaceAnalyzer.analyze(analyzer.segments),
+                visual = analyzer.visual.sortedBy { it.t },
+                video = video,
             )
         }
 

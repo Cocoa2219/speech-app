@@ -8,7 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import dev.cocoa.speech.gemini.createGeminiClient
+import dev.cocoa.speech.gemini.createGemini
 import dev.cocoa.speech.pipeline.LivePipeline
 import dev.cocoa.speech.record.AndroidAudioRecorder
 import dev.cocoa.speech.record.Recording
@@ -31,12 +31,13 @@ class MainActivity : ComponentActivity() {
         val cameraPermission = ActivityPermission(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
         // Demo only: the key is compiled into the APK from local.properties (see androidApp/build.gradle.kts).
         val apiKey = BuildConfig.GEMINI_API_KEY
-        val live = if (apiKey.isBlank()) null else LiveDeps(
+        val gemini = if (apiKey.isBlank()) null else {
+            createGemini(apiKey, cacheDir = if (BuildConfig.DEBUG) File(filesDir, "gemini-cache") else null)
+        }
+        val live = if (gemini == null) null else LiveDeps(
             recorder = AndroidAudioRecorder(applicationContext),
             micPermission = micPermission,
-            pipeline = LivePipeline(
-                createGeminiClient(apiKey, cacheDir = if (BuildConfig.DEBUG) File(filesDir, "gemini-cache") else null),
-            ),
+            pipeline = LivePipeline(gemini.generator, uploader = gemini.files),
             videoRecord = { onFinished, onCancel -> VideoRecordRoute(cameraPermission, onFinished, onCancel) },
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
         )

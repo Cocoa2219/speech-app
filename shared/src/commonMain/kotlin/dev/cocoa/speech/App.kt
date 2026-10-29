@@ -3,6 +3,7 @@ package dev.cocoa.speech
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,6 +12,7 @@ import androidx.compose.runtime.setValue
 import dev.cocoa.speech.logic.ResultsReport
 import dev.cocoa.speech.pipeline.LivePipeline
 import dev.cocoa.speech.pipeline.SampleCheck
+import dev.cocoa.speech.pipeline.Stage
 import dev.cocoa.speech.processing.ProcessingRoute
 import dev.cocoa.speech.record.Capture
 import dev.cocoa.speech.record.Permission
@@ -79,17 +81,22 @@ fun App(gradeStore: GradeStore, live: LiveDeps?, backHandler: BackHandlerSlot = 
                     { screen = Screen.Processing(s.grade, it) },
                     home,
                 )
-                is Screen.Processing -> ProcessingRoute(
-                    createRun = {
-                        live!!.pipeline.newRun(s.recording.audio, s.recording.mimeType, s.recording.durationSeconds, s.grade)
-                    },
-                    onDone = { report ->
-                        if (s.fromSample) scope.launch { runCatching { SampleCheck.log(report) } }
-                        screen = Screen.Results(s.grade, report)
-                    },
-                    onRerecord = { screen = Screen.Record(s.grade) },
-                    onHome = home,
-                )
+                is Screen.Processing -> {
+                    // The local video lives only as long as its run (CLAUDE.md privacy rules).
+                    DisposableEffect(s) { onDispose { s.recording.video?.discard() } }
+                    ProcessingRoute(
+                        stages = if (s.recording.video != null) Stage.entries else Stage.entries - Stage.VIDEO,
+                        createRun = { live!!.pipeline.newRun(s.recording, s.grade) },
+                        onDone = { report ->
+                            if (s.fromSample) scope.launch { runCatching { SampleCheck.log(report) } }
+                            screen = Screen.Results(s.grade, report)
+                        },
+                        onRerecord = {
+                            screen = if (s.recording.video != null) Screen.VideoRecord(s.grade) else Screen.Record(s.grade)
+                        },
+                        onHome = home,
+                    )
+                }
                 is Screen.Results -> ResultsRoute(grade = s.grade, live = s.live, onBack = home)
             }
         }

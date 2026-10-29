@@ -22,7 +22,16 @@ interface Permission {
     suspend fun request(): Boolean
 }
 
-class Recording(val audio: ByteArray, val mimeType: String, val durationSeconds: Double)
+// audio always feeds the pipeline; video (camera recordings) adds the scene timeline when present.
+class Recording(
+    val audio: ByteArray,
+    val mimeType: String,
+    val durationSeconds: Double,
+    val video: VideoInput? = null,
+)
+
+// A recorded video kept on device only until its run ends. Read lazily: ~23 MB for 3 minutes. discard() deletes it.
+class VideoInput(val mimeType: String, val read: suspend () -> ByteArray, val discard: () -> Unit)
 
 // Pipeline step 1 limits from CLAUDE.md.
 object RecordLimits {

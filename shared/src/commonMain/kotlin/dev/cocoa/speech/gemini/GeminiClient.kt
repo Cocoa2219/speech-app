@@ -48,6 +48,9 @@ class GeminiClient(
     sealed interface Part {
         data class Text(val text: String) : Part
         class Media(val mimeType: String, val bytes: ByteArray) : Part
+
+        // A file uploaded with GeminiFiles (needed above the 20 MB inline request limit, e.g. video).
+        data class FileRef(val mimeType: String, val uri: String) : Part
     }
 
     enum class Thinking { LOW, MEDIUM, HIGH }
@@ -82,8 +85,7 @@ class GeminiClient(
         }
         val body = response.bodyAsText()
         if (!response.status.isSuccess()) {
-            val error = runCatching { AppJson.decodeFromString<ErrorEnvelope>(body).error }.getOrNull()
-            throw GeminiException(response.status.value, error?.status, error?.message ?: "HTTP ${response.status.value}")
+            throw GeminiException.from(response.status.value, body)
         }
         val decoded = AppJson.decodeFromString<GenerateContentResponse>(body)
         decoded.usageMetadata?.let(onUsage)
@@ -111,6 +113,10 @@ class GeminiClient(
                                     is Part.Media -> putJsonObject("inlineData") {
                                         put("mimeType", part.mimeType)
                                         put("data", Base64.encode(part.bytes))
+                                    }
+                                    is Part.FileRef -> putJsonObject("fileData") {
+                                        put("mimeType", part.mimeType)
+                                        put("fileUri", part.uri)
                                     }
                                 }
                             }
@@ -141,7 +147,15 @@ class GeminiClient(
     }
 }
 
-class GeminiException(val httpStatus: Int, val reason: String?, message: String) : Exception(message)
+class GeminiException(val httpStatus: Int, val reason: String?, message: String) : Exception(message) {
+    companion object {
+        // Builds the exception from an error response body ({"error": {code, message, status}}).
+        fun from(httpStatus: Int, body: String): GeminiException {
+            val error = runCatching { AppJson.decodeFromString<ErrorEnvelope>(body).error }.getOrNull()
+            return GeminiException(httpStatus, error?.status, error?.message ?: "HTTP $httpStatus")
+        }
+    }
+}
 
 @Serializable
 data class GenerateContentResponse(

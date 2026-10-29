@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.cocoa.speech.logic.RankedFix
 import dev.cocoa.speech.logic.ResultsReport
+import dev.cocoa.speech.logic.VideoStatus
 import dev.cocoa.speech.logic.ResultsReport.Companion.formatTime
 import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.model.PersonaEvent
@@ -53,6 +54,7 @@ import speech_app.shared.generated.resources.results_no_fixes
 import speech_app.shared.generated.resources.results_no_questions
 import speech_app.shared.generated.resources.results_no_recording
 import speech_app.shared.generated.resources.results_no_replay
+import speech_app.shared.generated.resources.results_video_failed
 import speech_app.shared.generated.resources.results_retry
 import speech_app.shared.generated.resources.results_tab_fixes
 import speech_app.shared.generated.resources.results_tab_questions
@@ -106,6 +108,13 @@ private fun ResultsContent(report: ResultsReport, isExample: Boolean, position: 
         modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (report.video == VideoStatus.FAILED) {
+            Text(
+                stringResource(Res.string.results_video_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         ReplayPanel(report.segments, isExample, position)
         ConfusionTimeline(report.heatmap, report.events, report.durationSeconds, position, onSeek)
     }
