@@ -35,11 +35,16 @@ Android + Kotlin Multiplatform shell. Do not sink time into polish before the Da
 2. **In parallel**
     - Audio -> transcript with timestamps (Korean, ko-KR; handle Korean-English mixing).
     - Video -> scene timeline (what is on screen, slide changes, pointing, MM:SS).
-3. **Merge by time**, then run the **neutral analyzer** (no role-play): terms with a difficulty label (everyday /
-   school / specialist), claims and their reasons, dependencies, and said-vs-shown mismatches.
-4. **Personas** run in parallel as rule filters over the analyzer output. The "what has been defined so far" ledger is
-   kept in CODE, not in the model.
-    - Classmate: undefined terms, skipped steps, dense slides.
+3. **Merge by time**, then run the **neutral analyzer** (no role-play, prompt `prompts/analyzer.md`): terms with a
+   difficulty label (everyday / school / specialist), claims and their reasons, said-vs-shown mismatches, and `steps`
+   (conclusions with the premises they depend on). For `steps` the analyzer lists only premises a listener at the
+   selected grade would not know, at most 2 per step, about 10 steps per 3 minutes. Then validate in code (see
+   "Quote validation" below).
+4. **Personas**: CODE decides where hands go up (`PersonaRules`); the persona model call only writes `reason`, `fix`,
+   and the kid's `question` for each trigger. No model-proposed extra flags in v1. The "what has been defined so far"
+   ledger is kept in CODE, not in the model.
+    - Classmate: undefined terms, dense slides, skipped steps (a step with any premise whose `stated_at` is null or
+      later than the step's `t`; the quote is the step's `claim_quote`).
     - Teacher: claims without evidence, "as you can see" with nothing visible.
     - Kid: "why?" where a claim has no reason, "what's that?" for unexplained terms or visuals. Written as the kid's own
       question.
@@ -67,7 +72,9 @@ Android + Kotlin Multiplatform shell. Do not sink time into polish before the Da
   "terms": [{"term": "...", "t": 12.0, "level": "everyday|school|specialist", "defined_at": null}],
   "claims": [{"t": 20.5, "text": "...", "has_reason": false, "evidence_on_screen": null}],
   "visual": [{"t": 18.0, "summary": "...", "slide_index": 2}],
-  "mismatches": [{"t": 33.0, "type": "shown_not_said|said_not_shown|dense_slide|pointing_unnamed", "quote": "..."}]
+  "mismatches": [{"t": 33.0, "type": "shown_not_said|said_not_shown|dense_slide|pointing_unnamed", "quote": "..."}],
+  "steps": [{"id": "s1", "t": 40.0, "claim_quote": "exact transcript words",
+             "requires": [{"text": "premise in one sentence", "stated_at": null, "stated_quote": null}]}]
 }
 // PersonaEvent
 {
@@ -81,7 +88,26 @@ Android + Kotlin Multiplatform shell. Do not sink time into polish before the Da
 }
 ```
 
-Reject any PersonaEvent whose `quote` is empty or not found in the transcript/visual text.
+### Quote validation (`QuoteValidator`)
+
+- **Normalize before matching**, always: keep letters and digits only, lowercased. Whitespace, punctuation, and quote
+  marks never decide a match. Adjacent transcript segments are joined, so a quote may span a segment boundary.
+- Reject any PersonaEvent whose `quote` is empty or not found in the transcript/visual text.
+- Step quotes are grounded in the transcript only, never in on-screen text:
+    - `claim_quote` not found: drop the step.
+    - `stated_at` null: the premise was never stated; keep it (this is what raises a skipped-step hand).
+    - `stated_at` set: search for `stated_quote` only in segments within ±10 s of `stated_at`. If it is missing or not
+      found, DROP the premise (do not flag) and log the step id. A paraphrase cannot be told apart from a premise that
+      was never said, so a miss must not raise a hand.
+- Logs carry step ids and times only, never transcript text.
+
+### Grade
+
+The listener grade fills `{{grade}}` in `prompts/analyzer.md` (via `PromptTemplate.analyzer`). It comes from the grade
+picker on the setup screen (`SetupRoute`): options 초등학교 1-6학년, 중학교 1-3학년, 고등학교 1-3학년, and
+"일반 성인 (demo)"; default "중학교 2학년"; the last choice is remembered in SharedPreferences (`PrefsGradeStore`).
+`Grade.resolve` never returns an empty grade: blank or unknown values fall back to the default. Mock mode always uses
+the default, because the fixtures were written for it.
 
 ## Build order (layers)
 
@@ -95,7 +121,11 @@ Reject any PersonaEvent whose `quote` is empty or not found in the transcript/vi
 - **Deferred**: custom personas, history, extra preset personas, live/streaming feedback, PDF slide import,
   body-language scoring.
 
-Checkpoints: Day 1 benchmark (Korean 60 s and 3 min clips: transcription speed, timestamp precision, fillers, upload
+Model: `gemini-3.8-flash` for every stage (stable, audio/video input, structured outputs), set in
+`shared/src/commonMain/kotlin/dev/cocoa/speech/GeminiModels.kt`. The developer chose to skip the Day 1 benchmark; the
+transcription notes below are still unverified, so check them while building Layer 1.
+
+Checkpoints: (skipped) Day 1 benchmark (Korean 60 s and 3 min clips: transcription speed, timestamp precision, fillers, upload
 time; plus screen/board/poster clips: can it read the text?). Day 2 go/no-go vs. laundry app. Day 4 demo path works end
 to end on a 60 s clip.
 
