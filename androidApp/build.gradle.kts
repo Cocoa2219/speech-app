@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -19,6 +20,13 @@ dependencies {
     debugImplementation(libs.compose.uiTooling)
 }
 
+// GEMINI_API_KEY comes from local.properties (gitignored). Read through a provider so the configuration cache notices
+// when the key changes. Demo-only: anything in BuildConfig can be extracted from the APK.
+val geminiApiKey: String = providers
+    .fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText
+    .map { text -> Properties().apply { load(text.reader()) }.getProperty("GEMINI_API_KEY", "").trim() }
+    .getOrElse("")
+
 android {
     namespace = "dev.cocoa.speech"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -29,6 +37,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     }
     packaging {
         resources {
@@ -50,5 +59,6 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
