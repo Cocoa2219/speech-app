@@ -103,6 +103,39 @@ class GeminiClientTest {
     }
 
     @Test
+    fun overloadIsRetriedThenSucceeds() = runTest {
+        var calls = 0
+        val client = GeminiClient("k", HttpClient(MockEngine {
+            if (calls++ < 2) {
+                respond("""{"error":{"code":503,"status":"UNAVAILABLE"}}""", HttpStatusCode.ServiceUnavailable, jsonHeaders)
+            } else {
+                respond(okBody("""{"text":"{}"}"""), HttpStatusCode.OK, jsonHeaders)
+            }
+        }))
+        assertEquals("{}", client.generateJson("m", "sys", emptyList(), schema))
+        assertEquals(3, calls)
+    }
+
+    @Test
+    fun overloadGivesUpAfterRetriesAndOtherErrorsAreNotRetried() = runTest {
+        var calls = 0
+        val overloaded = GeminiClient("k", HttpClient(MockEngine {
+            calls++
+            respond("""{"error":{"code":503,"status":"UNAVAILABLE"}}""", HttpStatusCode.ServiceUnavailable, jsonHeaders)
+        }))
+        assertEquals(503, assertFailsWith<GeminiException> { overloaded.generateJson("m", "sys", emptyList(), schema) }.httpStatus)
+        assertEquals(3, calls)
+
+        calls = 0
+        val badRequest = GeminiClient("k", HttpClient(MockEngine {
+            calls++
+            respond("""{"error":{"code":400,"status":"INVALID_ARGUMENT"}}""", HttpStatusCode.BadRequest, jsonHeaders)
+        }))
+        assertFailsWith<GeminiException> { badRequest.generateJson("m", "sys", emptyList(), schema) }
+        assertEquals(1, calls)
+    }
+
+    @Test
     fun blockedPromptAndEmptyOutputThrow() = runTest {
         val blocked = assertFailsWith<GeminiException> {
             client(body = """{"promptFeedback":{"blockReason":"SAFETY"}}""", seen = mutableListOf())

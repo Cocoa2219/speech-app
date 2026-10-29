@@ -29,7 +29,11 @@ class QuoteValidator(
         return matches(quote, listOf(join(near)))
     }
 
-    fun filter(events: List<PersonaEvent>): List<PersonaEvent> = events.filter { isGrounded(it.quote) }
+    fun filter(events: List<PersonaEvent>): List<PersonaEvent> {
+        val kept = events.filter { isGrounded(it.quote) }
+        if (kept.size < events.size) log("QuoteValidator: dropped ${events.size - kept.size} of ${events.size} events (quote not found)")
+        return kept
+    }
 
     // Step quotes must come from the transcript; on-screen text never grounds them.
     // - claim_quote not found: the step is dropped.

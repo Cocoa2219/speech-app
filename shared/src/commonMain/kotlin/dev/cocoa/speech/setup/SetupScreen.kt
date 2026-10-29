@@ -14,6 +14,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import speech_app.shared.generated.resources.Res
+import speech_app.shared.generated.resources.setup_debug_sample
 import speech_app.shared.generated.resources.setup_grade_change
 import speech_app.shared.generated.resources.setup_grade_hint
 import speech_app.shared.generated.resources.setup_grade_label
@@ -36,7 +38,12 @@ import speech_app.shared.generated.resources.setup_title
 // Owns the grade state and persistence; the screen below stays stateless.
 // onRecord is null when there is no API key; only the example can be shown then.
 @Composable
-fun SetupRoute(store: GradeStore, onRecord: ((grade: String) -> Unit)?, onShowExample: () -> Unit) {
+fun SetupRoute(
+    store: GradeStore,
+    onRecord: ((grade: String) -> Unit)?,
+    onShowExample: () -> Unit,
+    onDebugSample: ((grade: String) -> Unit)? = null,
+) {
     var grade by remember { mutableStateOf(Grade.resolve(store.load())) }
     SetupScreen(
         grade = grade,
@@ -46,11 +53,18 @@ fun SetupRoute(store: GradeStore, onRecord: ((grade: String) -> Unit)?, onShowEx
         },
         onRecord = onRecord?.let { record -> { record(grade) } },
         onShowExample = onShowExample,
+        onDebugSample = onDebugSample?.let { sample -> { sample(grade) } },
     )
 }
 
 @Composable
-fun SetupScreen(grade: String, onGradeSelected: (String) -> Unit, onRecord: (() -> Unit)?, onShowExample: () -> Unit) {
+fun SetupScreen(
+    grade: String,
+    onGradeSelected: (String) -> Unit,
+    onRecord: (() -> Unit)?,
+    onShowExample: () -> Unit,
+    onDebugSample: (() -> Unit)? = null,
+) {
     Column(
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -72,6 +86,11 @@ fun SetupScreen(grade: String, onGradeSelected: (String) -> Unit, onRecord: (() 
         // Mock mode (Layer 0): fixture results, no network. Also the demo safety net.
         OutlinedButton(onClick = onShowExample, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(Res.string.setup_show_example))
+        }
+        if (onDebugSample != null) {
+            TextButton(onClick = onDebugSample, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.setup_debug_sample))
+            }
         }
     }
 }

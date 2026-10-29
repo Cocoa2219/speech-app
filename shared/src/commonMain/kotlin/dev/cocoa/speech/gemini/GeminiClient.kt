@@ -10,6 +10,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addJsonObject
@@ -57,10 +58,25 @@ class GeminiClient(
         schema: JsonObject,
         thinking: Thinking = Thinking.LOW,
     ): String {
+        val requestJson = requestBody(systemInstruction, parts, schema, thinking).toString()
+        // Overload errors (429/500/503) were common in testing on 2026-10-29; retry them a few times before the stage
+        // fails and the user has to tap retry.
+        for (wait in RETRY_DELAYS_MS) {
+            try {
+                return post(model, requestJson)
+            } catch (e: GeminiException) {
+                if (e.httpStatus !in RETRYABLE_STATUS) throw e
+            }
+            delay(wait)
+        }
+        return post(model, requestJson)
+    }
+
+    private suspend fun post(model: String, requestJson: String): String {
         val response = http.post("$baseUrl/models/$model:generateContent") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
-            setBody(requestBody(systemInstruction, parts, schema, thinking).toString())
+            setBody(requestJson)
         }
         val body = response.bodyAsText()
         if (!response.status.isSuccess()) {
@@ -73,6 +89,8 @@ class GeminiClient(
     companion object {
         const val CONNECT_TIMEOUT_MS = 15_000L
         const val REQUEST_TIMEOUT_MS = 120_000L
+        val RETRY_DELAYS_MS = listOf(1_000L, 3_000L)
+        val RETRYABLE_STATUS = setOf(429, 500, 503)
 
         fun requestBody(systemInstruction: String, parts: List<Part>, schema: JsonObject, thinking: Thinking): JsonObject =
             buildJsonObject {

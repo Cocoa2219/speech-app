@@ -130,7 +130,7 @@ class AnalysisRunTest {
             when (prompt) {
                 "T" -> respond(envelope(transcriptBody), HttpStatusCode.OK, headers)
                 "A" -> if (analyzeAttempts++ in failAnalyze) {
-                    respond("""{"error":{"code":503,"message":"busy","status":"UNAVAILABLE"}}""", HttpStatusCode.ServiceUnavailable, headers)
+                    respond("""{"error":{"code":400,"message":"bad","status":"INVALID_ARGUMENT"}}""", HttpStatusCode.BadRequest, headers)
                 } else {
                     respond(envelope(analysis), HttpStatusCode.OK, headers)
                 }

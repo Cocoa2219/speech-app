@@ -20,7 +20,13 @@ import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.SetupRoute
 
 // Everything the live path needs. Null when there is no API key, so only the example (mock mode) is offered.
-class LiveDeps(val recorder: AudioRecorder, val permission: MicPermission, val pipeline: LivePipeline)
+// debugSample (debug builds only) loads a pushed audio file in place of the microphone; it returns null if none.
+class LiveDeps(
+    val recorder: AudioRecorder,
+    val permission: MicPermission,
+    val pipeline: LivePipeline,
+    val debugSample: (() -> Recording?)? = null,
+)
 
 private sealed interface Screen {
     data object Setup : Screen
@@ -41,6 +47,9 @@ fun App(gradeStore: GradeStore, live: LiveDeps?) {
                 Screen.Setup -> SetupRoute(
                     store = gradeStore,
                     onRecord = live?.let { { grade -> screen = Screen.Record(grade) } },
+                    onDebugSample = live?.debugSample?.let { load ->
+                        { grade -> load()?.let { screen = Screen.Processing(grade, it) } }
+                    },
                     onShowExample = { screen = Screen.Results(Grade.resolve(null, mockMode = true), live = null) },
                 )
                 is Screen.Record -> RecordRoute(

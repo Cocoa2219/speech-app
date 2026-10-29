@@ -1,5 +1,6 @@
 package dev.cocoa.speech.pipeline
 
+import dev.cocoa.speech.gemini.GeminiException
 import dev.cocoa.speech.logic.PersonaRules
 import dev.cocoa.speech.logic.ResultsReport
 import dev.cocoa.speech.model.AnalyzerOutput
@@ -58,7 +59,9 @@ class AnalysisRun(
             log("AnalysisRun: ${stage.name} failed after ${mark.elapsedNow()} (no speech)")
             throw e
         } catch (e: Exception) {
-            log("AnalysisRun: ${stage.name} failed after ${mark.elapsedNow()}: ${e::class.simpleName}")
+            // Gemini's status and reason codes help diagnose; its free-text message is left out on purpose.
+            val detail = (e as? GeminiException)?.let { " (HTTP ${it.httpStatus}, ${it.reason})" }.orEmpty()
+            log("AnalysisRun: ${stage.name} failed after ${mark.elapsedNow()}: ${e::class.simpleName}$detail")
             throw StageFailure(stage, cause = e)
         }
     }
