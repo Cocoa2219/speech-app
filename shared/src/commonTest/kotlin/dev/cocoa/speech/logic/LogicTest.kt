@@ -312,5 +312,21 @@ class PaceAnalyzerTest {
         assertEquals(2.5, strip.samples[0].syllablesPerSecond)
         assertEquals(listOf(1, 1), strip.samples.map { it.fillers })
         assertEquals(listOf(Pause(t = 2.0, seconds = 2.0)), strip.pauses)
+        // 5 + 7 syllables over 3 s of speech; the 2 s pause does not count.
+        assertEquals(4.0, strip.averageSyllablesPerSecond)
+    }
+
+    @Test
+    fun countsEnglishWordsBySyllableNotLetter() {
+        assertEquals(4 + 5, PaceAnalyzer.countSyllables("광합성은 photosynthesis")) // not 4 + 14
+        assertEquals(3 + 1, PaceAnalyzer.countSyllables("DNA 는")) // all caps is read letter by letter
+        assertEquals(1, PaceAnalyzer.countSyllables("rhythm")) // a word with only "y" still counts once
+        assertEquals(3, PaceAnalyzer.countSyllables("2학년")) // digits count one each
+    }
+
+    @Test
+    fun averageIsZeroWithoutTimedSpeech() {
+        assertEquals(0.0, PaceAnalyzer.analyze(listOf(Segment(3.0, 3.0, "음"))).averageSyllablesPerSecond)
+        assertEquals(0.0, PaceAnalyzer.analyze(emptyList()).averageSyllablesPerSecond)
     }
 }
