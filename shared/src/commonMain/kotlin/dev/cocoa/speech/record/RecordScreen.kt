@@ -1,6 +1,7 @@
 package dev.cocoa.speech.record
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,6 +41,7 @@ import speech_app.shared.generated.resources.Res
 import speech_app.shared.generated.resources.record_cancel
 import speech_app.shared.generated.resources.record_failed
 import speech_app.shared.generated.resources.record_finish
+import speech_app.shared.generated.resources.record_finishing
 import speech_app.shared.generated.resources.record_hint_idle
 import speech_app.shared.generated.resources.record_min_hint
 import speech_app.shared.generated.resources.record_pause
@@ -53,78 +55,85 @@ import speech_app.shared.generated.resources.record_title
 import speech_app.shared.generated.resources.record_warn
 import kotlin.coroutines.cancellation.CancellationException
 
-enum class RecordPhase { IDLE, RECORDING, PAUSED }
+enum class RecordPhase { IDLE, RECORDING, PAUSED, FINISHING }
 
-// Owns the recorder and the timer. Leaving this screen any way other than finishing discards the recording.
+// Owns the capture and the timer. Permission is asked on entry so a camera preview can show before recording starts.
+// Leaving this screen any way other than finishing discards the recording.
 @Composable
 fun RecordRoute(
-    recorder: AudioRecorder,
-    permission: MicPermission,
+    capture: Capture,
+    permission: Permission,
     onFinished: (Recording) -> Unit,
     onCancel: () -> Unit,
+    preview: (@Composable () -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
+    var granted by remember { mutableStateOf(false) }
     var phase by remember { mutableStateOf(RecordPhase.IDLE) }
     var elapsed by remember { mutableDoubleStateOf(0.0) }
     var problem by remember { mutableStateOf<StringResource?>(null) }
 
-    fun finish() {
-        val seconds = recorder.elapsedSeconds()
-        val audio = recorder.stop()
-        phase = RecordPhase.IDLE
-        onFinished(Recording(audio, recorder.mimeType, seconds))
+    LaunchedEffect(permission) {
+        granted = permission.request()
+        if (!granted) problem = Res.string.record_permission_denied
     }
+    DisposableEffect(capture) { onDispose { capture.cancel() } }
 
-    DisposableEffect(recorder) { onDispose { recorder.cancel() } }
+    fun finish() {
+        if (phase == RecordPhase.FINISHING) return
+        phase = RecordPhase.FINISHING
+        scope.launch {
+            try {
+                onFinished(capture.finish())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                capture.cancel()
+                problem = Res.string.record_failed
+                phase = RecordPhase.IDLE
+            }
+        }
+    }
 
     // Ticks the timer while recording and auto-stops at the limit.
     LaunchedEffect(phase) {
         while (phase == RecordPhase.RECORDING) {
-            elapsed = recorder.elapsedSeconds()
-            if (elapsed >= RecordLimits.MAX_SECONDS) {
-                finish()
-                break
-            }
+            elapsed = capture.elapsedSeconds()
+            if (elapsed >= RecordLimits.MAX_SECONDS) finish()
             delay(100)
         }
     }
 
     RecordScreen(
         phase = phase,
+        canStart = granted,
         elapsed = { elapsed },
         problem = problem,
+        preview = if (granted) preview else null,
         onStart = {
-            scope.launch {
-                problem = null
-                if (!permission.request()) {
-                    problem = Res.string.record_permission_denied
-                    return@launch
-                }
-                try {
-                    recorder.start()
-                    elapsed = 0.0
-                    phase = RecordPhase.RECORDING
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    recorder.cancel()
-                    problem = Res.string.record_failed
-                }
+            problem = null
+            try {
+                capture.start()
+                elapsed = 0.0
+                phase = RecordPhase.RECORDING
+            } catch (e: Exception) {
+                capture.cancel()
+                problem = Res.string.record_failed
             }
         },
         onPauseToggle = {
             if (phase == RecordPhase.RECORDING) {
-                recorder.pause()
-                elapsed = recorder.elapsedSeconds()
+                capture.pause()
+                elapsed = capture.elapsedSeconds()
                 phase = RecordPhase.PAUSED
-            } else {
-                recorder.resume()
+            } else if (phase == RecordPhase.PAUSED) {
+                capture.resume()
                 phase = RecordPhase.RECORDING
             }
         },
         onFinish = ::finish,
         onCancel = {
-            recorder.cancel()
+            capture.cancel()
             onCancel()
         },
     )
@@ -133,8 +142,10 @@ fun RecordRoute(
 @Composable
 fun RecordScreen(
     phase: RecordPhase,
+    canStart: Boolean,
     elapsed: () -> Double,
     problem: StringResource?,
+    preview: (@Composable () -> Unit)?,
     onStart: () -> Unit,
     onPauseToggle: () -> Unit,
     onFinish: () -> Unit,
@@ -147,25 +158,32 @@ fun RecordScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(Res.string.record_title), style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onCancel) { Text(stringResource(Res.string.record_cancel)) }
+            TextButton(onClick = onCancel, enabled = phase != RecordPhase.FINISHING) {
+                Text(stringResource(Res.string.record_cancel))
+            }
         }
-        if (phase == RecordPhase.IDLE) {
-            Text(
+        if (preview != null) {
+            Box(Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) { preview() }
+        }
+        when (phase) {
+            RecordPhase.IDLE -> Text(
                 stringResource(Res.string.record_hint_idle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        } else {
-            RecordTimer(phase, elapsed)
+            RecordPhase.FINISHING -> Text(stringResource(Res.string.record_finishing), style = MaterialTheme.typography.bodyLarge)
+            else -> RecordTimer(phase, elapsed)
         }
         if (problem != null) {
             Text(stringResource(problem), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
-        Spacer(Modifier.weight(1f))
-        if (phase == RecordPhase.IDLE) {
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.record_start)) }
-        } else {
-            RecordControls(phase, elapsed, onPauseToggle, onFinish)
+        if (preview == null) Spacer(Modifier.weight(1f))
+        when (phase) {
+            RecordPhase.IDLE -> Button(onClick = onStart, enabled = canStart, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.record_start))
+            }
+            RecordPhase.FINISHING -> LinearProgressIndicator(Modifier.fillMaxWidth())
+            else -> RecordControls(phase, elapsed, onPauseToggle, onFinish)
         }
     }
 }

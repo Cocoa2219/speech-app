@@ -1,7 +1,9 @@
 package dev.cocoa.speech
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -10,12 +12,13 @@ import dev.cocoa.speech.gemini.createGeminiClient
 import dev.cocoa.speech.pipeline.LivePipeline
 import dev.cocoa.speech.record.AndroidAudioRecorder
 import dev.cocoa.speech.record.Recording
-import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.PrefsGradeStore
+import dev.cocoa.speech.video.VideoRecordRoute
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,22 +26,26 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val gradeStore = PrefsGradeStore(applicationContext)
+        // Both launchers must be registered here, before the activity starts.
+        val micPermission = ActivityPermission(this, arrayOf(Manifest.permission.RECORD_AUDIO))
+        val cameraPermission = ActivityPermission(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
         // Demo only: the key is compiled into the APK from local.properties (see androidApp/build.gradle.kts).
         val apiKey = BuildConfig.GEMINI_API_KEY
         val live = if (apiKey.isBlank()) null else LiveDeps(
             recorder = AndroidAudioRecorder(applicationContext),
-            permission = ActivityMicPermission(this),
+            micPermission = micPermission,
             pipeline = LivePipeline(
                 createGeminiClient(apiKey, cacheDir = if (BuildConfig.DEBUG) File(filesDir, "gemini-cache") else null),
             ),
+            videoRecord = { onFinished, onCancel -> VideoRecordRoute(cameraPermission, onFinished, onCancel) },
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
         )
         setContent {
-            App(gradeStore, live)
+            App(gradeStore, live, backHandler = { enabled, onBack -> BackHandler(enabled, onBack) })
         }
     }
 
-    // Debug only: a 16-bit PCM WAV copied into the app's files dir (see CLAUDE.md, Commands) replaces the microphone.
+    // Debug only: a 16-bit PCM WAV copied into the app's files dir (tools/make-sample.ps1 -Push) replaces the microphone.
     private fun loadDebugSample(): Recording? {
         val file = File(filesDir, "sample.wav")
         if (!file.exists()) return null

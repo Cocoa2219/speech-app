@@ -31,7 +31,10 @@ Android + Kotlin Multiplatform shell. Do not sink time into polish before the Da
 ## Pipeline
 
 1. **Record**: rear camera, up to 3 min (soft warning 2:30, auto-stop 3:00), minimum 20-30 s, pause supported. Compress
-   video on device. Extract the audio track separately.
+   video on device. Extract the audio track separately. Implemented: microphone-only (`AndroidAudioRecorder`) and
+   camera (`CameraCapture`, CameraX at SD quality, 1 Mbps; the AAC track is copied out to `.m4a` without re-encoding).
+   Camera recordings currently feed only their audio to Layer 1 and the video file is deleted. For Layer 2, 3 minutes
+   of video is ~23 MB, over the 20 MB inline request limit, so video needs the Files API.
 2. **In parallel**
     - Audio -> transcript with timestamps (Korean, ko-KR; handle Korean-English mixing).
     - Video -> scene timeline (what is on screen, slide changes, pointing, MM:SS).
@@ -170,8 +173,10 @@ Run from the repo root (Git Bash or PowerShell). `local.properties` (gitignored)
 Debug builds only (the API key is on the free tier, 20 requests per day; one run is 3 requests, or 5 with
 `PipelineConfig.PARALLEL_PERSONA_CALLS`):
 
-- Analyze a WAV instead of the microphone: `adb push sample.wav /data/local/tmp/` then
-  `adb shell run-as dev.cocoa.speech cp /data/local/tmp/sample.wav files/sample.wav`, and tap "샘플 파일로 분석 (디버그)".
+- Analyze a WAV instead of the microphone: `pwsh tools/make-sample.ps1 -Push` speaks
+  `fixtures/sample-seasons/script.txt` with Windows TTS (byte-identical each time, so the answer cache hits) and copies it
+  into the app; tap "샘플 파일로 분석 (디버그)". After the run the log prints `Expectations: n/m met; missed=[ids];
+  violated=[ids]`, checked against the hand-written `fixtures/sample-seasons/expected.json`.
 - Model answers are cached on the device by request hash (`CachingGenerator`), so rerunning the same input spends no
   requests; a changed prompt re-spends only the stages it affects. Clear with
   `adb shell run-as dev.cocoa.speech rm -r files/gemini-cache`.

@@ -3,19 +3,14 @@ package dev.cocoa.speech.record
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
-import android.os.SystemClock
 import java.io.File
 
 // 16 kHz mono AAC in an ADTS stream ("audio/aac", a Gemini-supported type). Gemini downsamples audio to 16 kbps
 // anyway, so a higher rate only adds upload time. 3 minutes is about 1 MB, well under the 20 MB inline limit.
-class AndroidAudioRecorder(private val context: Context) : AudioRecorder {
-    override val mimeType = "audio/aac"
-
+class AndroidAudioRecorder(private val context: Context) : Capture {
     private var recorder: MediaRecorder? = null
     private val file get() = File(context.cacheDir, "recording.aac")
-
-    private var accumulatedMs = 0L
-    private var runningSinceMs: Long? = null
+    private val clock = PausableClock()
 
     override fun start() {
         cancel()
@@ -31,33 +26,29 @@ class AndroidAudioRecorder(private val context: Context) : AudioRecorder {
         r.prepare()
         r.start()
         recorder = r
-        accumulatedMs = 0
-        runningSinceMs = SystemClock.elapsedRealtime()
+        clock.start()
     }
 
     override fun pause() {
-        val since = runningSinceMs ?: return
+        if (!clock.running) return
         recorder?.pause()
-        accumulatedMs += SystemClock.elapsedRealtime() - since
-        runningSinceMs = null
+        clock.pause()
     }
 
     override fun resume() {
-        if (runningSinceMs != null || recorder == null) return
+        if (clock.running || recorder == null) return
         recorder?.resume()
-        runningSinceMs = SystemClock.elapsedRealtime()
+        clock.resume()
     }
 
-    override fun elapsedSeconds(): Double {
-        val running = runningSinceMs?.let { SystemClock.elapsedRealtime() - it } ?: 0L
-        return (accumulatedMs + running) / 1000.0
-    }
+    override fun elapsedSeconds(): Double = clock.seconds()
 
-    override fun stop(): ByteArray {
-        val r = recorder ?: return ByteArray(0)
+    override suspend fun finish(): Recording {
+        val r = recorder ?: error("Not recording")
+        clock.stop()
         try {
             r.stop()
-            return file.readBytes()
+            return Recording(file.readBytes(), "audio/aac", clock.seconds())
         } finally {
             release(r)
         }
@@ -73,7 +64,7 @@ class AndroidAudioRecorder(private val context: Context) : AudioRecorder {
     private fun release(r: MediaRecorder) {
         r.release()
         recorder = null
-        runningSinceMs = null
+        clock.stop()
         file.delete()
     }
 }

@@ -32,6 +32,7 @@ import speech_app.shared.generated.resources.setup_grade_hint
 import speech_app.shared.generated.resources.setup_grade_label
 import speech_app.shared.generated.resources.setup_no_key
 import speech_app.shared.generated.resources.setup_record
+import speech_app.shared.generated.resources.setup_record_video
 import speech_app.shared.generated.resources.setup_show_example
 import speech_app.shared.generated.resources.setup_title
 
@@ -42,6 +43,7 @@ fun SetupRoute(
     store: GradeStore,
     onRecord: ((grade: String) -> Unit)?,
     onShowExample: () -> Unit,
+    onRecordVideo: ((grade: String) -> Unit)? = null,
     onDebugSample: ((grade: String) -> Unit)? = null,
 ) {
     var grade by remember { mutableStateOf(Grade.resolve(store.load())) }
@@ -53,6 +55,7 @@ fun SetupRoute(
         },
         onRecord = onRecord?.let { record -> { record(grade) } },
         onShowExample = onShowExample,
+        onRecordVideo = onRecordVideo?.let { record -> { record(grade) } },
         onDebugSample = onDebugSample?.let { sample -> { sample(grade) } },
     )
 }
@@ -63,6 +66,7 @@ fun SetupScreen(
     onGradeSelected: (String) -> Unit,
     onRecord: (() -> Unit)?,
     onShowExample: () -> Unit,
+    onRecordVideo: (() -> Unit)? = null,
     onDebugSample: (() -> Unit)? = null,
 ) {
     Column(
@@ -75,6 +79,11 @@ fun SetupScreen(
         if (onRecord != null) {
             Button(onClick = onRecord, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.setup_record))
+            }
+            if (onRecordVideo != null) {
+                OutlinedButton(onClick = onRecordVideo, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(Res.string.setup_record_video))
+                }
             }
         } else {
             Text(

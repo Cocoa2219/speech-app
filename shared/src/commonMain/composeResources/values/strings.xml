@@ -5,6 +5,7 @@
     <string name="setup_grade_change">학년 바꾸기</string>
     <string name="setup_show_example">예시 결과 보기</string>
     <string name="setup_record">녹음 시작</string>
+    <string name="setup_record_video">영상으로 녹화 (지금은 소리만 분석)</string>
     <string name="setup_debug_sample">샘플 파일로 분석 (디버그)</string>
     <string name="setup_no_key">API 키가 없어서 예시 결과만 볼 수 있어요.</string>
 
@@ -18,8 +19,9 @@
     <string name="record_min_hint">20초 이상 말하면 끝낼 수 있어요.</string>
     <string name="record_recording">녹음 중</string>
     <string name="record_paused">일시정지됨</string>
+    <string name="record_finishing">녹음을 마무리하는 중이에요…</string>
     <string name="record_warn">곧 끝나요. 3분이 되면 자동으로 멈춰요.</string>
-    <string name="record_permission_denied">마이크 권한이 있어야 녹음할 수 있어요.</string>
+    <string name="record_permission_denied">권한이 있어야 녹음할 수 있어요. 설정에서 마이크(영상은 카메라도) 권한을 허용해 주세요.</string>
     <string name="record_failed">녹음을 시작하지 못했어요.</string>
     <string name="record_time_desc">녹음 시간 %1$s, 최대 %2$s</string>
 

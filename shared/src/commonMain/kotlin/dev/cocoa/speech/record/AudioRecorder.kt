@@ -1,10 +1,8 @@
 package dev.cocoa.speech.record
 
-// Microphone recording. Android: MediaRecorder (androidMain). One recording at a time.
-interface AudioRecorder {
-    // MIME type of the bytes stop() returns, as Gemini expects it.
-    val mimeType: String
-
+// One recording session, microphone only (AndroidAudioRecorder) or camera with sound (androidMain CameraCapture).
+// Either way the pipeline gets audio: Layer 1 analyzes audio only.
+interface Capture {
     fun start()
     fun pause()
     fun resume()
@@ -12,15 +10,15 @@ interface AudioRecorder {
     // Recorded time so far, excluding pauses.
     fun elapsedSeconds(): Double
 
-    // Ends the recording and returns the audio. The temporary file is deleted.
-    fun stop(): ByteArray
+    // Ends the recording and returns its audio. Temporary files are deleted.
+    suspend fun finish(): Recording
 
     // Discards any recording in progress. Safe to call when idle.
     fun cancel()
 }
 
-// RECORD_AUDIO permission. Android: an ActivityResult launcher in androidApp.
-interface MicPermission {
+// A runtime permission request (microphone, or camera plus microphone). Android: ActivityResult launchers in androidApp.
+interface Permission {
     suspend fun request(): Boolean
 }
 
