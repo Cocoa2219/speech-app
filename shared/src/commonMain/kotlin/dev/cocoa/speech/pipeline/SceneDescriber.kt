@@ -4,6 +4,7 @@ import dev.cocoa.speech.GeminiModels
 import dev.cocoa.speech.gemini.GeminiClient
 import dev.cocoa.speech.gemini.JsonGenerator
 import dev.cocoa.speech.gemini.MediaUploader
+import dev.cocoa.speech.gemini.ResponseCache
 import dev.cocoa.speech.model.AppJson
 import dev.cocoa.speech.model.Visual
 import kotlinx.serialization.SerialName
@@ -12,24 +13,39 @@ import kotlinx.serialization.Serializable
 // Video -> scene timeline (prompts/video.md). The video is uploaded with the Files API (too large to send inline) and
 // deleted as soon as the call returns. Default media resolution and ~1 fps sampling: on-screen text matters, and slide
 // changes are slow enough for 1 fps.
+// The answer is cached by the video's content (not its upload URI, which changes every time), checked before
+// uploading: a video seen before is neither uploaded nor sent to the model again (debug builds).
 class SceneDescriber(
     private val client: JsonGenerator,
     private val uploader: MediaUploader,
     private val prompt: String,
+    private val cache: ResponseCache = ResponseCache.None,
 ) {
     suspend fun describe(video: ByteArray, mimeType: String): List<Scene> {
-        val json = uploader.withUploaded(video, mimeType) { file ->
-            client.generateJson(
-                model = GeminiModels.VIDEO,
-                systemInstruction = prompt,
-                parts = listOf(file, GeminiClient.Part.Text("Describe what is visible in this video.")),
-                schema = Schemas.video,
-            )
+        val key = listOf(
+            "scenes".encodeToByteArray(),
+            GeminiModels.VIDEO.encodeToByteArray(),
+            prompt.encodeToByteArray(),
+            mimeType.encodeToByteArray(),
+            video,
+            Schemas.video.toString().encodeToByteArray(),
+        )
+        val json = cache.getOrPut(key) {
+            uploader.withUploaded(video, mimeType) { file ->
+                client.generateJson(
+                    model = GeminiModels.VIDEO,
+                    systemInstruction = prompt,
+                    parts = listOf(file, GeminiClient.Part.Text(INSTRUCTION)),
+                    schema = Schemas.video,
+                )
+            }
         }
         return toScenes(AppJson.decodeFromString<SceneDto>(json))
     }
 
     companion object {
+        private const val INSTRUCTION = "Describe what is visible in this video."
+
         fun toScenes(dto: SceneDto): List<Scene> =
             dto.scenes.mapNotNull { s ->
                 val t = Transcriber.parseTimestamp(s.t) ?: return@mapNotNull null

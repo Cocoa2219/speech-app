@@ -182,9 +182,13 @@ Debug builds only (the API key is on the free tier, 20 requests per day; one run
   `fixtures/sample-seasons/script.txt` with Windows TTS (byte-identical each time, so the answer cache hits) and copies it
   into the app; tap "샘플 파일로 분석 (디버그)". After the run the log prints `Expectations: n/m met; missed=[ids];
   violated=[ids]`, checked against the hand-written `fixtures/sample-seasons/expected.json`.
-- Model answers are cached on the device by request hash (`CachingGenerator`), so rerunning the same input spends no
-  requests; a changed prompt re-spends only the stages it affects. Clear with
+- Model answers are cached on the device by request content (`FileResponseCache`), so rerunning the same input spends
+  no requests; a changed prompt re-spends only the stages it affects. Video scenes are cached by the video's bytes,
+  checked before uploading, so a cached video is not uploaded again. The cache survives `adb install -r`; clear it with
   `adb shell run-as dev.cocoa.speech rm -r files/gemini-cache`.
+- "마지막 녹음 다시 분석 (디버그)" re-runs the pipeline on the kept latest recording with byte-identical input, so a
+  real recording can be re-tested for free after changing rules, ranking, or UI. Testing habit: record once, then
+  re-analyze; only record again when the recording itself is what is being tested.
 - Token counts per call are logged as `GeminiUsage:` (counts only). Watch with `adb logcat System.out:I *:S`.
 
 Test results land in `shared/build/test-results/`. In Git Bash, set `MSYS_NO_PATHCONV=1` before `adb shell` commands

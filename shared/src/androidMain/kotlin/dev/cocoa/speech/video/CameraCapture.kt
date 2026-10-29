@@ -17,9 +17,7 @@ import androidx.lifecycle.LifecycleOwner
 import dev.cocoa.speech.record.Capture
 import dev.cocoa.speech.record.PausableClock
 import dev.cocoa.speech.record.Recording
-import dev.cocoa.speech.record.ReplayMedia
 import dev.cocoa.speech.replay.ReplayFiles
-import dev.cocoa.speech.record.VideoInput
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -100,19 +98,16 @@ class CameraCapture(private val context: Context) : Capture {
         try {
             // Some finalize errors still leave a usable file (for example the source went inactive), so check the file.
             if (!videoFile.exists() || videoFile.length() == 0L) error("Recording failed (CameraX error ${event.error})")
-            val video = File(ReplayFiles.dir(context), "last.mp4")
-            if (!videoFile.renameTo(video)) error("Could not keep the recording")
-            val audio = withContext(Dispatchers.IO) {
-                AudioTrackExtractor.extract(video, audioFile)
-                audioFile.readBytes()
+            return withContext(Dispatchers.IO) {
+                AudioTrackExtractor.extract(videoFile, audioFile)
+                ReplayFiles.keep(
+                    ReplayFiles.dir(context),
+                    audio = audioFile,
+                    audioMimeType = AudioTrackExtractor.MIME_TYPE,
+                    video = videoFile,
+                    durationSeconds = clock.seconds(),
+                )
             }
-            return Recording(
-                audio = audio,
-                mimeType = AudioTrackExtractor.MIME_TYPE,
-                durationSeconds = clock.seconds(),
-                video = VideoInput("video/mp4", read = { withContext(Dispatchers.IO) { video.readBytes() } }),
-                replay = ReplayMedia(video.absolutePath, isVideo = true),
-            )
         } catch (e: Exception) {
             ReplayFiles.clear(context)
             throw e

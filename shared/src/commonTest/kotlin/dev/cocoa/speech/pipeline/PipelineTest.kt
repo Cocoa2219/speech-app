@@ -3,6 +3,7 @@ package dev.cocoa.speech.pipeline
 import dev.cocoa.speech.gemini.GeminiClient
 import dev.cocoa.speech.gemini.GeminiException
 import dev.cocoa.speech.gemini.MediaUploader
+import dev.cocoa.speech.gemini.ResponseCache
 import dev.cocoa.speech.logic.VideoStatus
 import dev.cocoa.speech.record.VideoInput
 import dev.cocoa.speech.logic.PersonaTrigger
@@ -299,5 +300,29 @@ class AnalysisRunTest {
         assertEquals(1, uploader.uploads) // a failed video is not uploaded again on retry
         assertTrue(inputs.none { "scenes" in it }) // the analyzer ran audio-only
         assertTrue(report.visual.isEmpty())
+    }
+
+    @Test
+    fun cachedVideoIsNeitherUploadedNorSentAgain() = runTest {
+        val calls = mutableListOf<String>()
+        val uploader = FakeUploader()
+        val memory = object : ResponseCache {
+            val answers = mutableMapOf<List<String>, String>()
+            override suspend fun getOrPut(key: List<ByteArray>, compute: suspend () -> String): String =
+                answers.getOrPut(key.map { it.decodeToString() }) { compute() }
+        }
+        val engine = MockEngine {
+            calls += "V"
+            respond(envelope(sceneJson), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val describer = SceneDescriber(GeminiClient("k", HttpClient(engine)), uploader, "V", memory)
+
+        val first = describer.describe(byteArrayOf(1, 2), "video/mp4")
+        val second = describer.describe(byteArrayOf(1, 2), "video/mp4")
+        describer.describe(byteArrayOf(1, 3), "video/mp4") // a different video misses
+
+        assertEquals(first, second)
+        assertEquals(2, uploader.uploads)
+        assertEquals(2, calls.size)
     }
 }

@@ -29,7 +29,8 @@ import kotlinx.coroutines.launch
 typealias VideoRecordScreen = @Composable (onFinished: (Recording) -> Unit, onCancel: () -> Unit) -> Unit
 
 // Everything the live path needs. Null when there is no API key, so only the example (mock mode) is offered.
-// debugSample (debug builds only) loads a pushed audio file in place of the microphone; it returns null if none.
+// Debug builds only: debugSample loads a pushed audio file in place of the microphone, and debugLast reloads the kept
+// latest recording for re-analysis (answered from the answer cache unless a prompt changed). Both return null if none.
 class LiveDeps(
     val recorder: Capture,
     val micPermission: Permission,
@@ -37,6 +38,7 @@ class LiveDeps(
     val videoRecord: VideoRecordScreen? = null,
     val replayPlayer: ReplayPlayer? = null,
     val debugSample: (() -> Recording?)? = null,
+    val debugLast: (() -> Recording?)? = null,
 )
 
 // The platform back handler (Android: androidx.activity.compose.BackHandler).
@@ -71,6 +73,9 @@ fun App(gradeStore: GradeStore, live: LiveDeps?, backHandler: BackHandlerSlot = 
                     onShowExample = { screen = Screen.Results(Grade.resolve(null, mockMode = true), live = null) },
                     onDebugSample = live?.debugSample?.let { load ->
                         { grade -> load()?.let { screen = Screen.Processing(grade, it, fromSample = true) } }
+                    },
+                    onDebugLast = live?.debugLast?.let { load ->
+                        { grade -> load()?.let { screen = Screen.Processing(grade, it) } }
                     },
                 )
                 is Screen.Record -> RecordRoute(

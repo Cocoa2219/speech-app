@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import speech_app.shared.generated.resources.Res
+import speech_app.shared.generated.resources.setup_debug_last
 import speech_app.shared.generated.resources.setup_debug_sample
 import speech_app.shared.generated.resources.setup_grade_change
 import speech_app.shared.generated.resources.setup_grade_hint
@@ -45,6 +46,7 @@ fun SetupRoute(
     onShowExample: () -> Unit,
     onRecordVideo: ((grade: String) -> Unit)? = null,
     onDebugSample: ((grade: String) -> Unit)? = null,
+    onDebugLast: ((grade: String) -> Unit)? = null,
 ) {
     var grade by remember { mutableStateOf(Grade.resolve(store.load())) }
     SetupScreen(
@@ -57,6 +59,7 @@ fun SetupRoute(
         onShowExample = onShowExample,
         onRecordVideo = onRecordVideo?.let { record -> { record(grade) } },
         onDebugSample = onDebugSample?.let { sample -> { sample(grade) } },
+        onDebugLast = onDebugLast?.let { last -> { last(grade) } },
     )
 }
 
@@ -68,6 +71,7 @@ fun SetupScreen(
     onShowExample: () -> Unit,
     onRecordVideo: (() -> Unit)? = null,
     onDebugSample: (() -> Unit)? = null,
+    onDebugLast: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
@@ -99,6 +103,11 @@ fun SetupScreen(
         if (onDebugSample != null) {
             TextButton(onClick = onDebugSample, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.setup_debug_sample))
+            }
+        }
+        if (onDebugLast != null) {
+            TextButton(onClick = onDebugLast, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.setup_debug_last))
             }
         }
     }

@@ -14,6 +14,7 @@ import dev.cocoa.speech.record.AndroidAudioRecorder
 import dev.cocoa.speech.record.Recording
 import dev.cocoa.speech.record.ReplayMedia
 import dev.cocoa.speech.replay.AndroidReplayPlayer
+import dev.cocoa.speech.replay.ReplayFiles
 import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.PrefsGradeStore
@@ -39,10 +40,11 @@ class MainActivity : ComponentActivity() {
         val live = if (gemini == null) null else LiveDeps(
             recorder = AndroidAudioRecorder(applicationContext),
             micPermission = micPermission,
-            pipeline = LivePipeline(gemini.generator, uploader = gemini.files),
+            pipeline = LivePipeline(gemini.generator, uploader = gemini.files, cache = gemini.cache),
             videoRecord = { onFinished, onCancel -> VideoRecordRoute(cameraPermission, onFinished, onCancel) },
             replayPlayer = { media, seek, onPosition -> AndroidReplayPlayer(media, seek, onPosition) },
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
+            debugLast = if (BuildConfig.DEBUG) { { ReplayFiles.last(ReplayFiles.dir(this)) } } else null,
         )
         setContent {
             App(gradeStore, live, backHandler = { enabled, onBack -> BackHandler(enabled, onBack) })

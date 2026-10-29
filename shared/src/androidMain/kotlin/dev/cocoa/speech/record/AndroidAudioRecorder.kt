@@ -51,10 +51,7 @@ class AndroidAudioRecorder(private val context: Context) : Capture {
         clock.stop()
         try {
             r.stop()
-            val audio = file.readBytes()
-            val kept = File(ReplayFiles.dir(context), "last.aac")
-            val replay = if (file.renameTo(kept)) ReplayMedia(kept.absolutePath, isVideo = false) else null
-            return Recording(audio, "audio/aac", clock.seconds(), replay = replay)
+            return ReplayFiles.keep(ReplayFiles.dir(context), file, "audio/aac", video = null, clock.seconds())
         } finally {
             release(r)
         }

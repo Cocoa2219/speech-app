@@ -7,6 +7,7 @@
     <string name="setup_record">녹음 시작</string>
     <string name="setup_record_video">영상으로 녹화</string>
     <string name="setup_debug_sample">샘플 파일로 분석 (디버그)</string>
+    <string name="setup_debug_last">마지막 녹음 다시 분석 (디버그)</string>
     <string name="setup_no_key">API 키가 없어서 예시 결과만 볼 수 있어요.</string>
 
     <string name="record_title">설명하기</string>

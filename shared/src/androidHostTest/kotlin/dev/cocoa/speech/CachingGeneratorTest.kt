@@ -1,6 +1,7 @@
 package dev.cocoa.speech
 
 import dev.cocoa.speech.gemini.CachingGenerator
+import dev.cocoa.speech.gemini.FileResponseCache
 import dev.cocoa.speech.gemini.GeminiClient
 import dev.cocoa.speech.gemini.JsonGenerator
 import kotlinx.coroutines.test.runTest
@@ -36,7 +37,7 @@ class CachingGeneratorTest {
     @Test
     fun sameRequestIsAnsweredFromDisk() = runTest {
         val fake = Fake()
-        val cache = CachingGenerator(fake, Files.createTempDirectory("gemini-cache").toFile(), log = {})
+        val cache = CachingGenerator(fake, FileResponseCache(Files.createTempDirectory("gemini-cache").toFile(), log = {}))
 
         val first = cache.generateJson("m", "prompt", audio(1, 2), schema)
         val second = cache.generateJson("m", "prompt", audio(1, 2), schema)
@@ -48,7 +49,7 @@ class CachingGeneratorTest {
     @Test
     fun anyChangeInTheRequestMisses() = runTest {
         val fake = Fake()
-        val cache = CachingGenerator(fake, Files.createTempDirectory("gemini-cache").toFile(), log = {})
+        val cache = CachingGenerator(fake, FileResponseCache(Files.createTempDirectory("gemini-cache").toFile(), log = {}))
 
         cache.generateJson("m", "prompt", audio(1, 2), schema)
         cache.generateJson("m", "prompt", audio(1, 3), schema) // different recording
@@ -62,7 +63,7 @@ class CachingGeneratorTest {
     fun failuresAreNotStored() = runTest {
         val dir = Files.createTempDirectory("gemini-cache").toFile()
         val fake = Fake(fail = true)
-        val cache = CachingGenerator(fake, dir, log = {})
+        val cache = CachingGenerator(fake, FileResponseCache(dir, log = {}))
 
         assertFailsWith<IllegalStateException> { cache.generateJson("m", "prompt", audio(1), schema) }
         assertTrue(dir.listFiles().orEmpty().isEmpty())
@@ -75,7 +76,7 @@ class CachingGeneratorTest {
     @Test
     fun logsCarryOnlyAKeyPrefix() = runTest {
         val logs = mutableListOf<String>()
-        val cache = CachingGenerator(Fake(), Files.createTempDirectory("gemini-cache").toFile(), log = logs::add)
+        val cache = CachingGenerator(Fake(), FileResponseCache(Files.createTempDirectory("gemini-cache").toFile(), log = logs::add))
         cache.generateJson("m", "비밀 전사문", audio(1), schema)
         cache.generateJson("m", "비밀 전사문", audio(1), schema)
         assertEquals(2, logs.size)

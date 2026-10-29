@@ -27,7 +27,6 @@ import org.jetbrains.compose.resources.stringResource
 import speech_app.shared.generated.resources.Res
 import speech_app.shared.generated.resources.results_pause
 import speech_app.shared.generated.resources.results_play
-import java.io.File
 
 // Replays the latest recording on the results screen with platform players (no extra dependency): VideoView for
 // camera recordings, MediaPlayer for audio. Reports the position every 100 ms while playing; seeks on each new request.
@@ -104,13 +103,4 @@ private class AudioPlayer(path: String, onEnd: () -> Unit) : Player {
     override fun seekTo(ms: Int) { mp?.seekTo(ms) }
     override fun positionMs() = mp?.currentPosition ?: 0
     override fun release() { mp?.release() }
-}
-
-// The one kept recording lives here (app-private, not backed up). Cleared when a new recording starts.
-object ReplayFiles {
-    fun dir(context: Context) = File(context.filesDir, "replay").apply { mkdirs() }
-
-    fun clear(context: Context) {
-        dir(context).listFiles()?.forEach { it.delete() }
-    }
 }
