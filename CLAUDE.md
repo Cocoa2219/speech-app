@@ -22,6 +22,10 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
 
 - Kotlin Multiplatform + Compose Multiplatform, **Android-first**. Camera and recording code lives in `androidMain`
   (CameraX).
+- UI: Material 3 Expressive (`theme/AppTheme.kt`: `MaterialExpressiveTheme`, expressive motion scheme). All text uses
+  Pretendard v1.3.9 (SIL OFL 1.1, four bundled weights in `composeResources/font`, license in
+  `composeResources/files/licenses`); do not fall back to the system font. Listener colors are fixed
+  (`ListenerColors`), not themed.
 - Gemini API for everything AI: transcription, video understanding, analyzer and persona calls (structured JSON output).
 - **No backend server.** Calls go straight from the app. Keep the API key out of git (`local.properties` / BuildConfig);
   a shipped APK would expose it, so this is demo-only.
