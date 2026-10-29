@@ -1,0 +1,58 @@
+{
+  "segments": [
+    {"t_start": 0.0, "t_end": 4.5, "text": "음, 오늘은 광합성에 대해서 설명해 볼게요."},
+    {"t_start": 4.5, "t_end": 9.8, "text": "광합성은 식물이 빛을 이용해서 스스로 양분을 만드는 과정이에요."},
+    {"t_start": 9.8, "t_end": 15.2, "text": "이 과정은 잎에 있는 엽록체에서 일어나요."},
+    {"t_start": 15.2, "t_end": 21.0, "text": "어, 엽록체 안에는 엽록소가 있어서 빛 에너지를 흡수해요."},
+    {"t_start": 21.0, "t_end": 26.4, "text": "그래서 식물은 초록색으로 보여요."},
+    {"t_start": 26.4, "t_end": 32.8, "text": "여기 보시면 이렇게 화살표가 들어가잖아요."},
+    {"t_start": 32.8, "t_end": 39.5, "text": "이산화탄소랑 물이 들어가면 포도당이랑 산소가 나와요."},
+    {"t_start": 39.5, "t_end": 45.0, "text": "그러니까 결국 캘빈 회로를 거쳐서 포도당이 만들어지는 거죠."},
+    {"t_start": 45.0, "t_end": 51.3, "text": "광합성은 지구 생명체에게 가장 중요한 과정이에요."},
+    {"t_start": 51.3, "t_end": 57.0, "text": "음, 그래서 숲을 보호해야 하는 거예요."},
+    {"t_start": 57.0, "t_end": 60.0, "text": "이상입니다."}
+  ],
+  "terms": [
+    {"term": "광합성", "t": 0.0, "level": "school", "defined_at": 4.5},
+    {"term": "양분", "t": 4.5, "level": "everyday", "defined_at": null},
+    {"term": "엽록체", "t": 9.8, "level": "school", "defined_at": null},
+    {"term": "엽록소", "t": 15.2, "level": "school", "defined_at": null},
+    {"term": "포도당", "t": 32.8, "level": "school", "defined_at": null},
+    {"term": "캘빈 회로", "t": 39.5, "level": "specialist", "defined_at": null}
+  ],
+  "claims": [
+    {"t": 4.5, "text": "광합성은 식물이 빛을 이용해서 스스로 양분을 만드는 과정이에요.", "has_reason": true, "evidence_on_screen": null},
+    {"t": 21.0, "text": "그래서 식물은 초록색으로 보여요.", "has_reason": false, "evidence_on_screen": null},
+    {"t": 45.0, "text": "광합성은 지구 생명체에게 가장 중요한 과정이에요.", "has_reason": false, "evidence_on_screen": null},
+    {"t": 51.3, "text": "음, 그래서 숲을 보호해야 하는 거예요.", "has_reason": false, "evidence_on_screen": null}
+  ],
+  "visual": [
+    {"t": 0.0, "summary": "제목 슬라이드: 광합성이란?", "slide_index": 1},
+    {"t": 9.0, "summary": "잎 단면 그림, 엽록체 라벨", "slide_index": 2},
+    {"t": 26.0, "summary": "광합성 도식: CO₂ + H₂O → 포도당 + O₂, 화살표", "slide_index": 3},
+    {"t": 39.0, "summary": "글자가 빽빽한 슬라이드: 명반응, 암반응, 캘빈 회로, ATP, NADPH", "slide_index": 4}
+  ],
+  "mismatches": [
+    {"t": 26.4, "type": "pointing_unnamed", "quote": "여기 보시면"},
+    {"t": 39.0, "type": "dense_slide", "quote": "명반응, 암반응, 캘빈 회로, ATP, NADPH"},
+    {"t": 39.5, "type": "shown_not_said", "quote": "명반응"}
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "t": 39.5,
+      "claim_quote": "캘빈 회로를 거쳐서 포도당이 만들어지는 거죠",
+      "requires": [
+        {"text": "흡수한 빛 에너지가 먼저 화학 에너지로 저장된다", "stated_at": null, "stated_quote": null}
+      ]
+    },
+    {
+      "id": "s2",
+      "t": 51.3,
+      "claim_quote": "그래서 숲을 보호해야 하는 거예요",
+      "requires": [
+        {"text": "광합성을 하면 산소가 나온다", "stated_at": 32.8, "stated_quote": "포도당이랑 산소가 나와요"}
+      ]
+    }
+  ]
+}
