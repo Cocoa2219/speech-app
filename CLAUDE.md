@@ -153,7 +153,17 @@ to end on a 60 s clip.
 
 ## Commands
 
-TODO: fill in build, run, and test commands once the project exists. Do not guess.
+Run from the repo root (Git Bash or PowerShell). `local.properties` (gitignored) must contain
+`sdk.dir=C:/Users/cocoa/AppData/Local/Android/Sdk`; use forward slashes, because backslashes are escape characters there.
+
+- Unit tests (commonTest + androidHostTest): `./gradlew :shared:testAndroidHostTest`
+- Debug APK: `./gradlew :androidApp:assembleDebug` → `androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+- Install and launch on a connected device:
+  `adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk` then
+  `adb shell am start -n dev.cocoa.speech/.MainActivity`
+
+Test results land in `shared/build/test-results/`. In Git Bash, set `MSYS_NO_PATHCONV=1` before `adb shell` commands
+that take device paths like `/sdcard/...`, or Git Bash rewrites them.
 
 ## Open questions
 
