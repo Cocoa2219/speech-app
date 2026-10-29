@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import dev.cocoa.speech.logic.RankedFix
 import dev.cocoa.speech.logic.ResultsReport
 import dev.cocoa.speech.logic.VideoStatus
+import dev.cocoa.speech.listeners.AnimatedListenerAvatar
+import dev.cocoa.speech.listeners.ListenerAvatar
+import dev.cocoa.speech.listeners.ListenerColors
 import dev.cocoa.speech.logic.ResultsReport.Companion.formatTime
 import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.model.PersonaEvent
@@ -122,7 +125,7 @@ private fun ResultsContent(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        ReplayPanel(report.segments, isExample, position, replayPlayer)
+        ReplayPanel(report.segments, report.events, isExample, position, replayPlayer)
         ConfusionTimeline(report.heatmap, report.events, report.durationSeconds, position, onSeek)
     }
     LazyColumn(
@@ -159,6 +162,7 @@ private fun ResultsContent(
 @Composable
 private fun ReplayPanel(
     segments: List<Segment>,
+    events: List<PersonaEvent>,
     isExample: Boolean,
     position: () -> Double,
     replayPlayer: (@Composable () -> Unit)?,
@@ -180,8 +184,29 @@ private fun ReplayPanel(
             )
         }
         PlaybackCaption(segments, position)
+        ListenerRow(events, position)
     }
 }
+
+// The three listeners; each raises a hand while playback is at one of their moments. Reads the position itself so
+// only this row re-runs as playback moves, and each avatar animates only when its raised state flips.
+@Composable
+private fun ListenerRow(events: List<PersonaEvent>, position: () -> Double) {
+    val t = position()
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        for (persona in Persona.entries) {
+            val raised = events.any { it.persona == persona && t >= it.t - RAISE_LEAD_S && t <= it.t + RAISE_HOLD_S }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                AnimatedListenerAvatar(persona, raised, Modifier.size(56.dp))
+                Text(personaLabel(persona), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+// A hand goes up just before the quoted moment and stays up long enough to notice.
+private const val RAISE_LEAD_S = 0.3
+private const val RAISE_HOLD_S = 3.0
 
 // Reads the position itself so the 10 Hz playback tick re-runs only this caption, not the player above it.
 @Composable
@@ -234,10 +259,11 @@ private fun QuestionCard(event: PersonaEvent, onSeek: (Double) -> Unit) {
     }
 }
 
+// Every card is a hand that went up, so the listener is shown with a raised hand.
 @Composable
 private fun PersonaTag(persona: Persona) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(Modifier.size(8.dp).background(personaColor(persona), CircleShape))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        ListenerAvatar(persona, raise = { 1f }, modifier = Modifier.size(28.dp))
         Text(personaLabel(persona), style = MaterialTheme.typography.labelMedium)
     }
 }
@@ -275,12 +301,8 @@ private fun ResultsError(onRetry: () -> Unit) {
     }
 }
 
-@Composable
-internal fun personaColor(persona: Persona): Color = when (persona) {
-    Persona.CLASSMATE -> MaterialTheme.colorScheme.primary
-    Persona.TEACHER -> MaterialTheme.colorScheme.tertiary
-    Persona.KID -> MaterialTheme.colorScheme.secondary
-}
+// The approved listener colors (fixed, not themed), so a pin's color names the same listener as its avatar.
+internal fun personaColor(persona: Persona): Color = ListenerColors.main(persona)
 
 @Composable
 internal fun personaLabel(persona: Persona): String = stringResource(
