@@ -8,8 +8,8 @@ classmate, a teacher, and a curious younger kid.
 
 Context: team project on "Solving problems using AI", demoed live to Google engineers. One developer, one week.
 
-**Status: proposed. The team has not voted yet.** Fallback is a laundry drying-time prediction app that shares the same
-Android + Kotlin Multiplatform shell. Do not sink time into polish before the Day 2 go/no-go.
+**Status: chosen.** The team voted for this app on 2026-10-29 (the laundry drying-time fallback is dropped). The
+current screens are test scaffolding; a full UI overhaul is planned, spec first.
 
 ## What makes it different (keep this in mind when deciding scope)
 
@@ -135,7 +135,7 @@ Flash answered the same JSON-schema request in ~3 s. Re-time 3.8 Flash before de
 transcription notes below are still unverified, so check them while building Layer 1.
 
 Checkpoints: (skipped) Day 1 benchmark (Korean 60 s and 3 min clips: transcription speed, timestamp precision, fillers, upload
-time; plus screen/board/poster clips: can it read the text?). Day 2 go/no-go vs. laundry app. Day 4 demo path works end
+time; plus screen/board/poster clips: can it read the text?). Day 2 go/no-go vs. laundry app (done 2026-10-29: go). Day 4 demo path works end
 to end on a 60 s clip.
 
 ## Rules
