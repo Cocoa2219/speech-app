@@ -149,6 +149,12 @@ to end on a 60 s clip.
   accounts. Never send audio, video, or transcripts to analytics or logs. Check consent rules for minors before any
   public release.
 - **Tone**: critique the explanation, never the student. No labels like "nervous" or "unconfident".
+- **Clarity, never truth** (decided 2026-10-29): listeners judge whether the explanation is clear, never whether it is
+  correct. The model may not know the topic (recent, local, class-specific, the student's own data), so no stage may
+  call a statement wrong or add facts the speaker did not say. Hand-raise rules are structural (undefined term, unstated
+  premise, claim without a reason). A `fix` names what is missing and where ("‘A’와 ‘B’ 사이에 이유를 한 문장"),
+  using only the speaker's words and on-screen text; it never supplies the definition, cause, or example itself.
+  Analyzer `steps` list a premise only when the conclusion logically depends on it.
 - **Language**: speech is Korean (ko-KR). Prompts and JSON keys in English. Quotes stay in the original language. UI
   language: confirm with the developer.
 - **Failure handling**: retry button per stage; if video processing fails, fall back to Layer 1 results.
@@ -196,6 +202,9 @@ that take device paths like `/sdcard/...`, or Git Bash rewrites them.
 
 ## Open questions
 
+- Optional "자료/메모" at setup: the student's notes or sources. Planned use: vocabulary hints for transcription,
+  terms the student already introduced, and the only allowed source of concrete facts in fixes. Needs a pipeline change
+  (a notes input to the analyzer and persona prompts).
 - Kid persona is observational only (no voice Q&A). Add tap-to-answer later?
 - Framing: start with room view (presenter + screen) only, or also a screen-only option?
 - Is per-word confidence available from the transcription model? If not, how do we mark uncertain words?
