@@ -22,6 +22,29 @@ class GradeTest {
     }
 
     @Test
+    fun optionsKeepTheirOrderAndLabels() {
+        assertEquals(13, Grade.options.size)
+        assertEquals("초등학교 1학년", Grade.options.first())
+        assertEquals("고등학교 3학년", Grade.options[11])
+    }
+
+    @Test
+    fun schoolAndYearRoundTripEveryOption() {
+        for (option in Grade.options) {
+            assertEquals(option, Grade.of(Grade.schoolOf(option), Grade.yearOf(option)))
+        }
+        assertEquals(null, Grade.schoolOf(Grade.ADULT_DEMO))
+    }
+
+    @Test
+    fun switchingSchoolKeepsOrClampsTheYear() {
+        val (elementary, middle, high) = Grade.schools
+        assertEquals("고등학교 3학년", Grade.of(high, Grade.yearOf("중학교 3학년")))
+        assertEquals("중학교 3학년", Grade.of(middle, Grade.yearOf("초등학교 5학년")))
+        assertEquals("초등학교 1학년", Grade.of(elementary, Grade.yearOf(Grade.ADULT_DEMO)))
+    }
+
+    @Test
     fun mockModeAlwaysUsesDefault() {
         assertEquals(Grade.DEFAULT, Grade.resolve("고등학교 1학년", mockMode = true))
     }

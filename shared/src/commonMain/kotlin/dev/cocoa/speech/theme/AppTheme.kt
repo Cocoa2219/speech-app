@@ -31,8 +31,17 @@ private val AppColors = lightColorScheme(
     onSurfaceVariant = Color(0xFF5A6170),
     surfaceContainerLowest = Color.White,
     surfaceContainerHigh = Color(0xFFECEEF0),
+    secondaryContainer = Color(0xFFE4E7EA),
+    onSecondaryContainer = Color(0xFF1E2329),
+    outline = Color(0xFFC9CDD3),
     outlineVariant = Color(0xFFD9DCE1),
+    error = Color(0xFFB42323),
+    errorContainer = Color(0xFFFBE3E3),
+    onErrorContainer = Color(0xFFB42323),
 )
+
+// The record dot: the one red that means "recording", on the record button and the status chip.
+val RecordRed = Color(0xFFE5484D)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
