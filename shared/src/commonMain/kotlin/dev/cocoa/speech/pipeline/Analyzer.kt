@@ -50,6 +50,9 @@ class Analyzer(private val client: JsonGenerator, private val prompt: String, pr
                 put("on_screen_text", s.onScreenText)
                 put("slide_index", s.slideIndex)
                 put("pointing_at", s.pointingAt)
+                put("deck_page", s.deckPage)
+                put("deck_text", s.deckText)
+                if (s.deckPage != null) put("deck_partial", s.deckPartial)
             }
         }
     }

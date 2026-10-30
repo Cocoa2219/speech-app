@@ -25,13 +25,14 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.camera.video.Recording as CameraRecording
 
-// Rear camera with sound (pipeline step 1). Video is compressed on device by recording at SD quality and a capped
-// bitrate. The audio track is copied out for transcription; the video goes to the scene timeline via the Files API
-// (3 minutes at 1 Mbps is ~23 MB, over the 20 MB inline limit). The finished video is moved to ReplayFiles for replay
-// and deleted when the next recording starts.
+// Rear camera with sound (pipeline step 1). Video is compressed on device by recording at HD (720p) and a capped
+// bitrate. HD, not SD (2026-10-30): on an SD copy of a test clip the scene model could not read small slide text and
+// filled it in from the attached PDF; the HD copy reported only what was readable. The audio track is copied out for
+// transcription; the video goes to the scene timeline via the Files API (3 minutes at 2.5 Mbps is ~56 MB). The finished
+// video is moved to ReplayFiles for replay and deleted when the next recording starts.
 class CameraCapture(private val context: Context) : Capture {
     private val recorder = Recorder.Builder()
-        .setQualitySelector(QualitySelector.from(Quality.SD, FallbackStrategy.higherQualityOrLowerThan(Quality.SD)))
+        .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.higherQualityOrLowerThan(Quality.HD)))
         .setTargetVideoEncodingBitRate(VIDEO_BITRATE)
         .build()
     private val videoCapture = VideoCapture.withOutput(recorder)
@@ -134,6 +135,6 @@ class CameraCapture(private val context: Context) : Capture {
     }
 
     private companion object {
-        const val VIDEO_BITRATE = 1_000_000
+        const val VIDEO_BITRATE = 2_500_000
     }
 }

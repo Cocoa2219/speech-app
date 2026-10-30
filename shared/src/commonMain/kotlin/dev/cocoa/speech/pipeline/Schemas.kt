@@ -65,6 +65,9 @@ object Schemas {
                 "on_screen_text" to string(nullable = true),
                 "slide_index" to integer(nullable = true),
                 "pointing_at" to string(nullable = true),
+                "deck_page" to integer(nullable = true),
+                "deck_text" to string(nullable = true),
+                "deck_partial" to boolean(nullable = true),
             ),
         ),
     )
@@ -87,7 +90,7 @@ object Schemas {
     private fun string(nullable: Boolean = false) = buildJsonObject(type("string", nullable))
     private fun number(nullable: Boolean = false) = buildJsonObject(type("number", nullable))
     private fun integer(nullable: Boolean = false) = buildJsonObject(type("integer", nullable))
-    private fun boolean() = buildJsonObject(type("boolean", false))
+    private fun boolean(nullable: Boolean = false) = buildJsonObject(type("boolean", nullable))
 
     private fun enum(vararg values: String) = buildJsonObject {
         put("type", "string")

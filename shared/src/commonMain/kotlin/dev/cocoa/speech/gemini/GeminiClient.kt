@@ -49,8 +49,10 @@ class GeminiClient(
         data class Text(val text: String) : Part
         class Media(val mimeType: String, val bytes: ByteArray) : Part
 
-        // A file uploaded with GeminiFiles (needed above the 20 MB inline request limit, e.g. video).
-        data class FileRef(val mimeType: String, val uri: String) : Part
+        // A file uploaded with GeminiFiles (e.g. video). highResolution sets the part's mediaResolution to
+        // MEDIA_RESOLUTION_HIGH (Part.mediaResolution.level, verified in https://ai.google.dev/api/generate-content on
+        // 2026-10-30): 280 tokens per video frame instead of the default 70, for reading slide text.
+        data class FileRef(val mimeType: String, val uri: String, val highResolution: Boolean = false) : Part
     }
 
     enum class Thinking { LOW, MEDIUM, HIGH }
@@ -114,9 +116,14 @@ class GeminiClient(
                                         put("mimeType", part.mimeType)
                                         put("data", Base64.encode(part.bytes))
                                     }
-                                    is Part.FileRef -> putJsonObject("fileData") {
-                                        put("mimeType", part.mimeType)
-                                        put("fileUri", part.uri)
+                                    is Part.FileRef -> {
+                                        putJsonObject("fileData") {
+                                            put("mimeType", part.mimeType)
+                                            put("fileUri", part.uri)
+                                        }
+                                        if (part.highResolution) {
+                                            putJsonObject("mediaResolution") { put("level", "MEDIA_RESOLUTION_HIGH") }
+                                        }
                                     }
                                 }
                             }

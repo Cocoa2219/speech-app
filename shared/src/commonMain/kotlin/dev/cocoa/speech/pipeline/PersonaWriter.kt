@@ -22,7 +22,8 @@ import kotlinx.serialization.json.putJsonArray
 // move a hand-raise: persona, time, type, and quote always come from the trigger.
 // parallel: one call per persona, run at once. Output length drives latency (one call for 17 triggers took ~22 s),
 // but it costs 3 requests instead of 1 against the daily request limit. See PipelineConfig.
-// material (memo, PDF deck): a fix may point to it; it never changes where hands go up.
+// material (memo, PDF deck): a fix may point to it; it never changes where hands go up. scenes give each trigger the
+// PDF page on screen at its time, so a fix names only a page code found, never one the model guessed.
 class PersonaWriter(
     private val client: JsonGenerator,
     private val prompt: String,
@@ -30,21 +31,25 @@ class PersonaWriter(
     private val parallel: Boolean = PipelineConfig.PARALLEL_PERSONA_CALLS,
     private val log: (String) -> Unit = ::println,
 ) {
-    suspend fun write(segments: List<Segment>, triggers: List<PersonaTrigger>): List<PersonaEvent> {
+    suspend fun write(segments: List<Segment>, triggers: List<PersonaTrigger>, scenes: List<Scene> = emptyList()): List<PersonaEvent> {
         val indexed = triggers.withIndex().toList()
         val groups = if (parallel) indexed.groupBy { it.value.persona }.values else listOf(indexed).filter { it.isNotEmpty() }
         val items = coroutineScope {
-            groups.map { group -> async { writeGroup(segments, group) } }.awaitAll().flatten()
+            groups.map { group -> async { writeGroup(segments, group, scenes) } }.awaitAll().flatten()
         }
         return events(triggers, items, log)
     }
 
     // Indexes stay global so events() can pair text with triggers; items for indexes outside the group are ignored.
-    private suspend fun writeGroup(segments: List<Segment>, group: List<IndexedValue<PersonaTrigger>>): List<PersonaDto.Item> {
+    private suspend fun writeGroup(
+        segments: List<Segment>,
+        group: List<IndexedValue<PersonaTrigger>>,
+        scenes: List<Scene>,
+    ): List<PersonaDto.Item> {
         val json = client.generateJson(
             model = GeminiModels.PERSONA,
             systemInstruction = prompt,
-            parts = material.parts() + GeminiClient.Part.Text(input(segments, group, material.notes)),
+            parts = material.parts() + GeminiClient.Part.Text(input(segments, group, material.notes, scenes)),
             schema = Schemas.persona,
         )
         val indexes = group.map { it.index }.toSet()
@@ -52,7 +57,12 @@ class PersonaWriter(
     }
 
     companion object {
-        fun input(segments: List<Segment>, triggers: List<IndexedValue<PersonaTrigger>>, notes: String = ""): String = buildJsonObject {
+        fun input(
+            segments: List<Segment>,
+            triggers: List<IndexedValue<PersonaTrigger>>,
+            notes: String = "",
+            scenes: List<Scene> = emptyList(),
+        ): String = buildJsonObject {
             put("segments", Analyzer.segmentsJson(segments))
             if (notes.isNotEmpty()) put("notes", notes)
             putJsonArray("triggers") {
@@ -63,6 +73,7 @@ class PersonaWriter(
                         put("t", trigger.t)
                         put("type", AppJson.encodeToJsonElement(EventType.serializer(), trigger.type))
                         put("quote", trigger.quote)
+                        Scene.deckPageAt(scenes, trigger.t)?.let { put("deck_page", it) }
                     }
                 }
             }

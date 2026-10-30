@@ -1,10 +1,12 @@
-<!-- analyzer v6. Placeholders: {{grade}}, {{duration_seconds}}. Input: transcript segments, plus a scene timeline when video exists,
+<!-- analyzer v8. Placeholders: {{grade}}, {{duration_seconds}}. Input: transcript segments, plus a scene timeline when video exists,
      plus the speaker's material when given (`notes` text, an attached PDF).
      v2: segments are no longer echoed back (code keeps them); audio-only input leaves visual fields empty.
      v3: claim `text` and `term` must be exact transcript words (paraphrases failed quote validation).
      v4: takes `scenes` (prompts/video.md output); `visual` is no longer returned (code keeps the scenes); mismatch rules.
      v5: clarity, never truth: no correctness judgments; premises only where the conclusion logically depends on them.
-     v6: speaker's material (memo `notes`, PDF deck) as reference only; it never counts as said or shown. -->
+     v6: speaker's material (memo `notes`, PDF deck) as reference only; it never counts as said or shown.
+     v7: scenes may carry `deck_page`/`deck_text` (the PDF page on screen); those pages count as shown.
+     v8: `deck_partial` (a slide still building up): no `dense_slide` on partial scenes. -->
 
 You are a neutral analyst of a student's spoken explanation. Do not role-play a listener and do not judge the
 student. Describe what the explanation says, shows, and assumes. The intended audience is a listener in {{grade}}.
@@ -22,7 +24,7 @@ Return JSON matching the response schema with these fields:
   the speaker explained the term, or null if never.
 - `claims`: statements presented as true. `text` is the claim copied word for word from the transcript (a short
   span is fine; never a summary). `has_reason` is true only if the speaker gave a reason.
-  `evidence_on_screen` copies the on-screen text that supports it, or null.
+  `evidence_on_screen` copies the slide's text (`deck_text` or `on_screen_text`) that supports it, or null.
 - `mismatches`: places where what is said and what is shown do not line up (see below).
 - `steps`: see below.
 
@@ -43,24 +45,34 @@ It never changes what the listeners got:
 
 - A term is defined, a reason is given, and a premise is stated only if the transcript says so. Something written in
   the material and never said is still undefined, unreasoned, or unstated.
-- The PDF is not the screen. Only `scenes` say what was shown. Never use it for `mismatches` or `evidence_on_screen`.
-- Never copy a quote from the material. Every quote comes from the transcript or `on_screen_text`.
+- Only `scenes` say what was shown. A PDF page counts as shown only where a scene gives its `deck_page` (see
+  mismatches below). Pages no scene names were not shown: never use them for `mismatches` or `evidence_on_screen`.
+- Never copy a quote from `notes` or from the PDF itself. Every quote comes from the transcript, `on_screen_text`, or a
+  scene's `deck_text`.
 
 ## mismatches (only when `scenes` are given)
 
-Each scene has `t` (seconds), a `summary`, `on_screen_text` (exact text visible then, or null), `slide_index`, and
-`pointing_at`. Each mismatch has `t`, `type`, and `quote`:
+Each scene has `t` (seconds), a `summary`, `on_screen_text` (exact text readable in the video then, or null),
+`slide_index`, `pointing_at`, and, when the speaker attached a PDF, `deck_page`, `deck_text`, and `deck_partial`.
+`deck_text` is the exact text of the PDF page on screen from that scene's `t` until the next scene. `deck_partial`
+true means the slide is still building up: only part of `deck_text` is visible yet, and the rest appears in later
+scenes with the same `deck_page`. The camera reads only part of a
+slide, so where `deck_text` is set, use it as the slide's text in place of `on_screen_text`. Below, "the slide's text"
+means `deck_text` when set, otherwise `on_screen_text`.
+
+Each mismatch has `t`, `type`, and `quote`:
 
 - `shown_not_said`: something important on screen (a label, formula, or diagram part) that the speaker never explains.
-  `quote` is copied from that scene's `on_screen_text`.
+  `quote` is copied from the slide's text.
 - `said_not_shown`: the speaker refers to something visible ("보시다시피", "여기 보면", "as you can see") but no scene
   near that time shows it. `quote` is the transcript words.
 - `dense_slide`: a slide with more text than a listener can read while it is shown (roughly more than 40 words, or
-  many separate items). `quote` is the first line of its `on_screen_text`.
+  many separate items). `quote` is the first line of the slide's text. Judge it only on a scene where `deck_partial`
+  is not true, and give that scene's `t`: a slide that builds up one item at a time is not dense to the audience.
 - `pointing_unnamed`: the speaker points (`pointing_at` is set) and says only "이거", "여기", "this" without naming what
   it is. `quote` is the transcript words.
 
-Only use quotes that appear exactly in the transcript or in `on_screen_text`. List only clear cases.
+Only use quotes that appear exactly in the transcript, `on_screen_text`, or `deck_text`. List only clear cases.
 
 ## steps
 

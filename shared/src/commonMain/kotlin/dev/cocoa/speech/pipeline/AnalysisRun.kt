@@ -63,9 +63,9 @@ class AnalysisRun(
         }.also { analysis = it }
 
         val events = events ?: stage(Stage.WRITE, onStage) {
-            val triggers = PersonaRules.triggers(analysis)
+            val triggers = Scene.withoutDenseOnPartialSlides(PersonaRules.triggers(analysis), scenes.orEmpty())
             log("AnalysisRun: ${triggers.size} triggers")
-            writer.write(segments, triggers)
+            writer.write(segments, triggers, scenes.orEmpty())
         }.also { events = it }
 
         ResultsReport.build(analysis, events, videoStatus ?: VideoStatus.NONE)

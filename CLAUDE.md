@@ -38,15 +38,15 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
 
 1. **Record**: rear camera, up to 3 min (soft warning 2:30, auto-stop 3:00), minimum 20-30 s, pause supported. Compress
    video on device. Extract the audio track separately. Implemented: microphone-only (`AndroidAudioRecorder`) and
-   camera (`CameraCapture`, CameraX at SD quality, 1 Mbps; the AAC track is copied out to `.m4a` without re-encoding).
-   3 minutes of video is ~23 MB, over the 20 MB inline request limit, so video goes through the Files API
+   camera (`CameraCapture`, CameraX at HD 720p, 2.5 Mbps, see "PDF pages on screen" for why not SD; the AAC track is
+   copied out to `.m4a` without re-encoding). 3 minutes of video is ~56 MB, so video goes through the Files API
    (`GeminiFiles`: upload, wait for ACTIVE, use, then DELETE in a `finally`). The local video file lives only until its
    run ends.
 2. **In parallel**
     - Audio -> transcript with timestamps (Korean, ko-KR; handle Korean-English mixing).
     - Video -> scene timeline (what is on screen, slide changes, pointing, MM:SS). Prompt `prompts/video.md`;
-      `SceneDescriber` turns each scene into a `Visual` whose summary carries the on-screen text verbatim, so screen
-      quotes can be grounded. If video fails, the run continues audio-only and `ResultsReport.video` is `FAILED`.
+      `SceneDescriber` turns each scene into a `Visual` whose summary carries the on-screen text verbatim (and the matched
+      PDF page's text, see "Speaker's material"), so screen quotes can be grounded. If video fails, the run continues audio-only and `ResultsReport.video` is `FAILED`.
 3. **Merge by time**, then run the **neutral analyzer** (no role-play, prompt `prompts/analyzer.md`): terms with a
    difficulty label (everyday / school / specialist), claims and their reasons, said-vs-shown mismatches, and `steps`
    (conclusions with the premises they depend on). For `steps` the analyzer lists only premises a listener at the
@@ -77,8 +77,9 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
 - Check that "smart dictation" does NOT strip filler words and false starts, or the pace/filler strip will be empty.
   Turn it off if needed.
 - Vocabulary hints from the user's pasted notes (best with ~100 terms) may not combine with timestamps. Test it.
-- Video is sampled at ~1 frame per second by default. Fine for slide changes; fast gestures may be missed. Use default
-  media resolution (not low) when on-screen text matters.
+- Video is sampled at ~1 frame per second by default. Fine for slide changes; fast gestures may be missed. For Gemini 3
+  video, default, low and medium media resolution are all 70 tokens per frame; high is 280 (docs, 2026-10-30). The
+  scene call sends the video part with `mediaResolution.level = MEDIA_RESOLUTION_HIGH` for slide text.
 
 ## Draft data contracts (generate Kotlin data classes with kotlinx.serialization; ask before changing)
 
@@ -132,12 +133,30 @@ a dismissible notice instead of an error.
 ### Speaker's material
 
 The setup memo (`TalkSetup.memo`) and the attached PDF (`TalkSetup.deckPath`) go to the analyzer and persona calls as
-`Material` (memo as the `notes` input field, PDF as an inline `application/pdf` part before the text; analyzer v6,
-persona v3). It is reference only: listeners never heard or saw it, so it never defines a term, states a premise, gives
-a reason, counts as on screen, or grounds a quote (`QuoteValidator` checks only transcript and visual text). The
+`Material` (memo as the `notes` input field, PDF as an inline `application/pdf` part before the text; analyzer v7,
+persona v4). Listeners never heard the memo, so it never defines a term, states a premise, or gives a reason. The
 analyzer uses it to recognize terms and to pick premises from the speaker's own reasoning instead of guessing; a fix
-may point to it and quote it ("메모에 적어 둔 ‘X’의 뜻을 …"). Both go inline with `store: false` (PDFs up to 50 MB
-inline, checked 2026-10-30), so nothing is left to delete. The PDF is sent twice (both calls). Logs carry sizes only.
+may point to it and quote it ("메모에 적어 둔 ‘X’의 뜻을 …").
+
+PDF pages on screen (decided 2026-10-30): on a video run the PDF also goes to the scene call (video v3), which names
+the page on screen per scene (`deck_page`), copies that page's text from the PDF (`deck_text`), and marks a slide that
+is still building up (`deck_partial`; the PDF holds the finished slide). The camera reads titles but often not body
+text, so the video says WHEN a page is shown and the PDF says WHAT is on it. A matched page counts
+as shown: its text goes into the `Visual` summary ("PDF page N: …"), so the analyzer can use it for `dense_slide`,
+`shown_not_said` and `evidence_on_screen`, and `QuoteValidator` grounds those quotes. Pages no scene names were never
+shown. The match is the model's judgment; code keeps it only if a readable word in the frame (`on_screen_text`) is on
+the matched page, and a picture-only slide keeps the model's match. Each persona trigger gets the page on screen at its
+time from code, and a fix names only that page. `dense_slide` is not raised on a partial scene (analyzer v8, and code
+drops such triggers in `Scene.withoutDenseOnPartialSlides`).
+
+Tested 2026-10-30 in the Gemini app (thinking LOW, a 13-page deck with morph transitions and builds, not yet through our
+API): pages and builds matched on a 1080p clip and a 720p copy, and `on_screen_text` held only readable text. On a 480p
+1 Mbps copy (the old SD setting) the pages still matched, but small text the video could not show was copied into
+`on_screen_text` from the PDF, which makes `deck_partial` and the frame-word check meaningless. Hence HD recording and
+high media resolution.
+
+Memo and PDF go inline with `store: false` (PDFs up to 50 MB inline, checked 2026-10-30), so nothing is left to
+delete. The PDF is sent up to three times (scene, analyzer, persona calls). Logs carry sizes and times only.
 
 ### Grade
 

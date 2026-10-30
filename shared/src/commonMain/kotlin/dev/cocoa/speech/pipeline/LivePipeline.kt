@@ -33,7 +33,7 @@ class LivePipeline(
             writer = PersonaWriter(client, PromptTemplate.persona(prompt("persona.md"), setup.grade), material),
             video = recording.video,
             describer = if (recording.video != null && uploader != null) {
-                SceneDescriber(client, uploader, prompt("video.md"), cache)
+                SceneDescriber(client, uploader, prompt("video.md"), cache, deck = deck)
             } else {
                 null
             },

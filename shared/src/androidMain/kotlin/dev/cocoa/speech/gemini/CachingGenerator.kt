@@ -24,7 +24,7 @@ class CachingGenerator(private val delegate: JsonGenerator, private val cache: R
                     add(("media:" + part.mimeType).toByteArray())
                     add(part.bytes)
                 }
-                is GeminiClient.Part.FileRef -> add(("file:" + part.mimeType + ":" + part.uri).toByteArray())
+                is GeminiClient.Part.FileRef -> add(("file:" + part.mimeType + ":" + part.uri + ":" + part.highResolution).toByteArray())
             }
             add(schema.toString().toByteArray())
             add(thinking.name.toByteArray())
