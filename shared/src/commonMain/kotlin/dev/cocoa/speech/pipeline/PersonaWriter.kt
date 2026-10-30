@@ -22,9 +22,11 @@ import kotlinx.serialization.json.putJsonArray
 // move a hand-raise: persona, time, type, and quote always come from the trigger.
 // parallel: one call per persona, run at once. Output length drives latency (one call for 17 triggers took ~22 s),
 // but it costs 3 requests instead of 1 against the daily request limit. See PipelineConfig.
+// material (memo, PDF deck): a fix may point to it; it never changes where hands go up.
 class PersonaWriter(
     private val client: JsonGenerator,
     private val prompt: String,
+    private val material: Material = Material.None,
     private val parallel: Boolean = PipelineConfig.PARALLEL_PERSONA_CALLS,
     private val log: (String) -> Unit = ::println,
 ) {
@@ -42,7 +44,7 @@ class PersonaWriter(
         val json = client.generateJson(
             model = GeminiModels.PERSONA,
             systemInstruction = prompt,
-            parts = listOf(GeminiClient.Part.Text(input(segments, group))),
+            parts = material.parts() + GeminiClient.Part.Text(input(segments, group, material.notes)),
             schema = Schemas.persona,
         )
         val indexes = group.map { it.index }.toSet()
@@ -50,8 +52,9 @@ class PersonaWriter(
     }
 
     companion object {
-        fun input(segments: List<Segment>, triggers: List<IndexedValue<PersonaTrigger>>): String = buildJsonObject {
+        fun input(segments: List<Segment>, triggers: List<IndexedValue<PersonaTrigger>>, notes: String = ""): String = buildJsonObject {
             put("segments", Analyzer.segmentsJson(segments))
+            if (notes.isNotEmpty()) put("notes", notes)
             putJsonArray("triggers") {
                 for ((i, trigger) in triggers) {
                     addJsonObject {

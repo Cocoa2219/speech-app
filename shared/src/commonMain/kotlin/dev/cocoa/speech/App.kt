@@ -238,8 +238,7 @@ fun App(
                     entry<Screen.Processing>(metadata = { mapOf(DEPTH to it.depth) }) { s ->
                         ProcessingRoute(
                             stages = if (s.recording.video != null) Stage.entries else Stage.entries - Stage.VIDEO,
-                            // TODO: pass s.setup.memo once the prompts take notes (CLAUDE.md open question "자료/메모").
-                            createRun = { live!!.pipeline.newRun(s.recording, s.setup.grade) },
+                            createRun = { live!!.pipeline.newRun(s.recording, s.setup) },
                             onDone = { report ->
                                 if (s.fromSample) scope.launch { runCatching { SampleCheck.log(report) } }
                                 if (history != null && clock != null) {

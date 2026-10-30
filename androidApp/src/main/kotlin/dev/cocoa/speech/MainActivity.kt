@@ -20,6 +20,8 @@ import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.PrefsGradeStore
 import dev.cocoa.speech.video.VideoRecordRoute
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -43,7 +45,10 @@ class MainActivity : ComponentActivity() {
         val live = if (gemini == null) null else LiveDeps(
             recorder = AndroidAudioRecorder(applicationContext),
             micPermission = micPermission,
-            pipeline = LivePipeline(gemini.generator, uploader = gemini.files, cache = gemini.cache),
+            pipeline = LivePipeline(
+                gemini.generator, uploader = gemini.files, cache = gemini.cache,
+                readDeck = { path -> withContext(Dispatchers.IO) { File(path).takeIf { it.isFile }?.readBytes() } },
+            ),
             videoRecord = { onFinished, onCancel, onVoiceOnly -> VideoRecordRoute(cameraPermission, onFinished, onCancel, onVoiceOnly) },
             replayPlayer = { media, seek, onPosition -> AndroidReplayPlayer(media, seek, onPosition) },
             pickMaterial = materialPicker::pick,

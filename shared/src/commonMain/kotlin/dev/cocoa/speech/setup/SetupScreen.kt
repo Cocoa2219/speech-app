@@ -83,8 +83,8 @@ import speech_app.shared.generated.resources.setup_year
 import speech_app.shared.generated.resources.setup_year_group
 
 // What the student set up before recording. The topic names the history entry; the memo is kept with the run.
-// deckPath is an attached PDF (the slides), copied into app storage.
-// TODO: pass memo and deck to the analyzer and persona prompts (CLAUDE.md open question "자료/메모"); not wired yet.
+// deckPath is an attached PDF (the slides), copied into app storage. Memo and deck go to the analyzer and persona
+// calls as reference material (pipeline Material).
 data class TalkSetup(val grade: String, val topic: String = "", val memo: String = "", val deckPath: String? = null)
 
 const val MEMO_MAX_CHARS = 2000

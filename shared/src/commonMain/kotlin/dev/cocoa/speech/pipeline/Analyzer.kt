@@ -13,13 +13,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 // Transcript (+ scene timeline when there is video) -> neutral analysis (prompts/analyzer.md, already filled with
-// grade and duration). Without scenes, visual and mismatches stay empty.
-class Analyzer(private val client: JsonGenerator, private val prompt: String) {
+// grade and duration). Without scenes, visual and mismatches stay empty. material (memo, PDF deck) is reference only.
+class Analyzer(private val client: JsonGenerator, private val prompt: String, private val material: Material = Material.None) {
     suspend fun analyze(segments: List<Segment>, scenes: List<Scene> = emptyList()): AnalyzerOutput {
         val json = client.generateJson(
             model = GeminiModels.ANALYZER,
             systemInstruction = prompt,
-            parts = listOf(GeminiClient.Part.Text(input(segments, scenes))),
+            parts = material.parts() + GeminiClient.Part.Text(input(segments, scenes, material.notes)),
             schema = Schemas.analyzer,
             thinking = GeminiClient.Thinking.MEDIUM,
         )
@@ -29,9 +29,10 @@ class Analyzer(private val client: JsonGenerator, private val prompt: String) {
     }
 
     companion object {
-        fun input(segments: List<Segment>, scenes: List<Scene> = emptyList()): String = buildJsonObject {
+        fun input(segments: List<Segment>, scenes: List<Scene> = emptyList(), notes: String = ""): String = buildJsonObject {
             put("segments", segmentsJson(segments))
             if (scenes.isNotEmpty()) put("scenes", scenesJson(scenes))
+            if (notes.isNotEmpty()) put("notes", notes)
         }.toString()
 
         fun segmentsJson(segments: List<Segment>): JsonArray = buildJsonArray {

@@ -125,9 +125,19 @@ Designed on the "Listener characters" canvas (boards D-M). Flow: onboarding (fir
 -> record (camera or voice; a refused permission shows a settings screen, camera refused offers voice only) ->
 processing -> results (saved to history when the run finishes). "발표 자료 불러오기" (system picker, `ActivityMaterialPicker`) takes a
 PDF or a text file: a text file fills the memo; a PDF is not read on the device but copied to `files/material/deck.pdf`
-(one kept, replaced on the next pick) to be sent to Gemini with the run once the prompts take notes (not wired yet).
+(one kept, replaced on the next pick) and sent to Gemini with the run (see "Speaker's material" below).
 PPTX is not accepted: Gemini documents PDF only, and on-device conversion needs a paid library or a server. Results from a video run whose scene call failed show
 a dismissible notice instead of an error.
+
+### Speaker's material
+
+The setup memo (`TalkSetup.memo`) and the attached PDF (`TalkSetup.deckPath`) go to the analyzer and persona calls as
+`Material` (memo as the `notes` input field, PDF as an inline `application/pdf` part before the text; analyzer v6,
+persona v3). It is reference only: listeners never heard or saw it, so it never defines a term, states a premise, gives
+a reason, counts as on screen, or grounds a quote (`QuoteValidator` checks only transcript and visual text). The
+analyzer uses it to recognize terms and to pick premises from the speaker's own reasoning instead of guessing; a fix
+may point to it and quote it ("메모에 적어 둔 ‘X’의 뜻을 …"). Both go inline with `store: false` (PDFs up to 50 MB
+inline, checked 2026-10-30), so nothing is left to delete. The PDF is sent twice (both calls). Logs carry sizes only.
 
 ### Grade
 
@@ -178,7 +188,8 @@ to end on a 60 s clip.
   correct. The model may not know the topic (recent, local, class-specific, the student's own data), so no stage may
   call a statement wrong or add facts the speaker did not say. Hand-raise rules are structural (undefined term, unstated
   premise, claim without a reason). A `fix` names what is missing and where ("‘A’와 ‘B’ 사이에 이유를 한 문장"),
-  using only the speaker's words and on-screen text; it never supplies the definition, cause, or example itself.
+  using only the speaker's words, on-screen text, and the speaker's own material (memo, attached PDF); it never supplies
+  a definition, cause, or example from anywhere else.
   Analyzer `steps` list a premise only when the conclusion logically depends on it.
 - **Language**: speech is Korean (ko-KR). Prompts and JSON keys in English. Quotes stay in the original language. UI
   language: confirm with the developer.
@@ -227,10 +238,7 @@ that take device paths like `/sdcard/...`, or Git Bash rewrites them.
 
 ## Open questions
 
-- Optional "자료/메모" at setup: the student's notes or sources. Planned use: vocabulary hints for transcription,
-  terms the student already introduced, and the only allowed source of concrete facts in fixes. The setup field exists
-  (`TalkSetup.memo`, saved with the run) but is NOT sent to the model yet: needs a pipeline change (a notes input to the
-  analyzer and persona prompts).
+- Memo as vocabulary hints for transcription: not done; the transcribe call does not get the memo yet.
 - Kid persona is observational only (no voice Q&A). Add tap-to-answer later?
 - Framing: start with room view (presenter + screen) only, or also a screen-only option?
 - Is per-word confidence available from the transcription model? If not, how do we mark uncertain words?

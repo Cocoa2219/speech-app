@@ -19,6 +19,11 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -99,6 +104,53 @@ class PersonaWriterTest {
         assertEquals(2, first.getValue("index").jsonPrimitive.content.toInt()) // global index, not position in group
         assertEquals("kid", first.getValue("persona").jsonPrimitive.content)
         assertEquals("why_question", first.getValue("type").jsonPrimitive.content)
+        assertFalse("notes" in input) // no memo, no notes field
+    }
+
+    @Test
+    fun inputCarriesNotesWhenThereAreAny() {
+        val input = Json.parseToJsonElement(PersonaWriter.input(emptyList(), emptyList(), "엽록체: 잎의 초록 부분")).jsonObject
+        assertEquals("엽록체: 잎의 초록 부분", input.getValue("notes").jsonPrimitive.content)
+    }
+}
+
+class MaterialTest {
+    @Test
+    fun notesAreTrimmedAndTheDeckIsAPdfPart() {
+        assertEquals("메모", Material("  메모\n").notes)
+        assertTrue(Material.None.parts().isEmpty())
+        val part = Material(deck = byteArrayOf(1, 2)).parts().single() as GeminiClient.Part.Media
+        assertEquals("application/pdf", part.mimeType)
+    }
+
+    @Test
+    fun analyzerAndWriterSendTheDeckInlineBeforeTheText() = runTest {
+        val sent = mutableListOf<List<String>>()
+        val engine = MockEngine { request ->
+            val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+            val parts = body.getValue("contents").jsonArray[0].jsonObject.getValue("parts").jsonArray
+            sent += parts.map { it.jsonObject.keys.single() }
+            val answer = if (sent.size == 1) {
+                """{"terms":[],"claims":[],"mismatches":[],"steps":[]}"""
+            } else {
+                """{"items":[]}"""
+            }
+            respond(
+                buildJsonObject {
+                    putJsonArray("candidates") {
+                        addJsonObject { putJsonObject("content") { putJsonArray("parts") { addJsonObject { put("text", answer) } } } }
+                    }
+                }.toString(),
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val client = GeminiClient("k", HttpClient(engine))
+        val material = Material("메모", byteArrayOf(1, 2, 3))
+        Analyzer(client, "A", material).analyze(emptyList())
+        PersonaWriter(client, "W", material, parallel = false, log = {})
+            .write(emptyList(), listOf(PersonaTrigger(Persona.KID, 1.0, EventType.WHY_QUESTION, "q")))
+        assertEquals(listOf(listOf("inlineData", "text"), listOf("inlineData", "text")), sent)
     }
 }
 
@@ -140,6 +192,9 @@ class SceneDescriberTest {
         assertFalse("scenes" in Json.parseToJsonElement(Analyzer.input(emptyList())).jsonObject)
         val withScenes = Json.parseToJsonElement(Analyzer.input(emptyList(), listOf(Scene(1.0, "s", "글자")))).jsonObject
         assertEquals("글자", withScenes.getValue("scenes").jsonArray[0].jsonObject.getValue("on_screen_text").jsonPrimitive.content)
+        assertFalse("notes" in withScenes)
+        val withNotes = Json.parseToJsonElement(Analyzer.input(emptyList(), notes = "메모")).jsonObject
+        assertEquals("메모", withNotes.getValue("notes").jsonPrimitive.content)
     }
 }
 
