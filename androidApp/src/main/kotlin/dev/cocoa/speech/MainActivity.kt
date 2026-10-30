@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
         val gradeStore = PrefsGradeStore(applicationContext)
         val history = FileHistoryStore(File(filesDir, "history"))
         // The launchers must be registered here, before the activity starts.
-        val textPicker = ActivityTextFilePicker(this)
+        val materialPicker = ActivityMaterialPicker(this)
         val micPermission = ActivityPermission(this, arrayOf(Manifest.permission.RECORD_AUDIO))
         val cameraPermission = ActivityPermission(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
         // Demo only: the key is compiled into the APK from local.properties (see androidApp/build.gradle.kts).
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
             pipeline = LivePipeline(gemini.generator, uploader = gemini.files, cache = gemini.cache),
             videoRecord = { onFinished, onCancel, onVoiceOnly -> VideoRecordRoute(cameraPermission, onFinished, onCancel, onVoiceOnly) },
             replayPlayer = { media, seek, onPosition -> AndroidReplayPlayer(media, seek, onPosition) },
-            pickTextFile = textPicker::pick,
+            pickMaterial = materialPicker::pick,
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
             debugLast = if (BuildConfig.DEBUG) { { ReplayFiles.last(ReplayFiles.dir(this)) } } else null,
         )

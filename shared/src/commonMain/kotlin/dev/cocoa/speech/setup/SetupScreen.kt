@@ -1,6 +1,7 @@
 package dev.cocoa.speech.setup
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.cocoa.speech.theme.Glyph
@@ -55,6 +57,8 @@ import org.jetbrains.compose.resources.stringResource
 import speech_app.shared.generated.resources.Res
 import speech_app.shared.generated.resources.setup_back
 import speech_app.shared.generated.resources.setup_debug_last
+import speech_app.shared.generated.resources.setup_deck_attached
+import speech_app.shared.generated.resources.setup_deck_remove
 import speech_app.shared.generated.resources.setup_debug_sample
 import speech_app.shared.generated.resources.setup_grade_hint
 import speech_app.shared.generated.resources.setup_grade_label
@@ -79,14 +83,23 @@ import speech_app.shared.generated.resources.setup_year
 import speech_app.shared.generated.resources.setup_year_group
 
 // What the student set up before recording. The topic names the history entry; the memo is kept with the run.
-// TODO: pass memo to the analyzer and persona prompts (CLAUDE.md open question "자료/메모"); not wired yet.
-data class TalkSetup(val grade: String, val topic: String = "", val memo: String = "")
+// deckPath is an attached PDF (the slides), copied into app storage.
+// TODO: pass memo and deck to the analyzer and persona prompts (CLAUDE.md open question "자료/메모"); not wired yet.
+data class TalkSetup(val grade: String, val topic: String = "", val memo: String = "", val deckPath: String? = null)
 
 const val MEMO_MAX_CHARS = 2000
 
-// Opens the platform file picker and hands back the file's name and its text: a PowerPoint deck's slide text
-// (SlideText) or a plain text file. Nothing happens if the user cancels or the file cannot be read.
-typealias TextFilePicker = (onPicked: (name: String, text: String) -> Unit) -> Unit
+// What "발표 자료 불러오기" picked: a text file's contents (they go into the memo), or a PDF, which is not read on the
+// device but kept as an app-private copy to send to the model with the run.
+sealed interface PickedMaterial {
+    val name: String
+
+    data class Text(override val name: String, val text: String) : PickedMaterial
+    data class Pdf(override val name: String, val path: String) : PickedMaterial
+}
+
+// Opens the platform file picker (PDF or text). Nothing happens if the user cancels or the file cannot be read.
+typealias MaterialPicker = (onPicked: (PickedMaterial) -> Unit) -> Unit
 
 // A loaded file is added after what is already in the memo, and the whole memo is cut at the limit.
 internal fun mergeMemo(memo: String, text: String): String =
@@ -100,17 +113,19 @@ fun SetupRoute(
     onBack: () -> Unit,
     onRecord: ((TalkSetup) -> Unit)?,
     onRecordVideo: ((TalkSetup) -> Unit)? = null,
-    pickTextFile: TextFilePicker? = null,
+    pickMaterial: MaterialPicker? = null,
     onDebugSample: ((TalkSetup) -> Unit)? = null,
     onDebugLast: ((TalkSetup) -> Unit)? = null,
 ) {
-    // Saveable, so coming back from the record screen keeps what was typed.
+    // Saveable, so coming back from the record screen keeps what was typed and attached.
     var grade by rememberSaveable { mutableStateOf(Grade.resolve(store.load())) }
     var topic by rememberSaveable { mutableStateOf("") }
     var memo by rememberSaveable { mutableStateOf("") }
     var loadedFile by rememberSaveable { mutableStateOf<String?>(null) }
     var truncated by rememberSaveable { mutableStateOf(false) }
-    val setup = { TalkSetup(grade, topic.trim(), memo.trim()) }
+    var deckName by rememberSaveable { mutableStateOf<String?>(null) }
+    var deckPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val setup = { TalkSetup(grade, topic.trim(), memo.trim(), deckPath) }
     SetupScreen(
         grade = grade,
         topic = topic,
@@ -123,14 +138,27 @@ fun SetupRoute(
         onMemoChange = { memo = it.take(MEMO_MAX_CHARS) },
         loadedFile = loadedFile,
         truncated = truncated,
-        onPickFile = pickTextFile?.let { pick ->
+        deckName = deckName,
+        onPickFile = pickMaterial?.let { pick ->
             {
-                pick { name, text ->
-                    truncated = (memo.length + text.length) > MEMO_MAX_CHARS
-                    memo = mergeMemo(memo, text)
-                    loadedFile = name
+                pick { picked ->
+                    when (picked) {
+                        is PickedMaterial.Text -> {
+                            truncated = (memo.length + picked.text.length) > MEMO_MAX_CHARS
+                            memo = mergeMemo(memo, picked.text)
+                            loadedFile = picked.name
+                        }
+                        is PickedMaterial.Pdf -> {
+                            deckName = picked.name
+                            deckPath = picked.path
+                        }
+                    }
                 }
             }
+        },
+        onRemoveDeck = {
+            deckName = null
+            deckPath = null
         },
         onBack = onBack,
         onRecord = onRecord?.let { record -> { record(setup()) } },
@@ -140,8 +168,9 @@ fun SetupRoute(
     )
 }
 
-// Canvas board K: topic, then the grade as a school (joined buttons) and a year (pills), then optional notes that
-// open from a dashed button. The actions stay at the bottom; everything above scrolls, and moves up with the keyboard.
+// Canvas board K: topic, then the grade as a school (joined buttons) and a year (pills), then optional notes with a
+// file button (PDF attaches, text fills the memo). The actions stay at the bottom; everything above scrolls, and moves
+// up with the keyboard.
 @Composable
 fun SetupScreen(
     grade: String,
@@ -153,7 +182,9 @@ fun SetupScreen(
     onBack: () -> Unit,
     loadedFile: String? = null,
     truncated: Boolean = false,
+    deckName: String? = null,
     onPickFile: (() -> Unit)? = null,
+    onRemoveDeck: () -> Unit = {},
     onRecord: (() -> Unit)?,
     onRecordVideo: (() -> Unit)? = null,
     onDebugSample: (() -> Unit)? = null,
@@ -173,7 +204,7 @@ fun SetupScreen(
         ) {
             TopicField(topic, onTopicChange)
             GradePicker(grade, onGradeSelected)
-            MemoField(memo, onMemoChange, loadedFile, truncated, onPickFile)
+            MemoField(memo, onMemoChange, loadedFile, truncated, deckName, onPickFile, onRemoveDeck)
         }
         Actions(onRecord, onRecordVideo, onDebugSample, onDebugLast)
     }
@@ -240,7 +271,9 @@ private fun MemoField(
     onChange: (String) -> Unit,
     loadedFile: String?,
     truncated: Boolean,
+    deckName: String?,
     onPickFile: (() -> Unit)?,
+    onRemoveDeck: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel(
@@ -258,11 +291,34 @@ private fun MemoField(
             shape = RoundedCornerShape(18.dp),
             colors = fieldColors(),
         )
+        if (deckName != null) DeckChip(deckName, onRemoveDeck)
         if (onPickFile != null) FileRow(loadedFile, truncated, onPickFile)
     }
 }
 
-// "발표 자료 불러오기" under the memo; after a load it names the file, and says so when the memo hit the limit.
+// The attached PDF, with a button to take it off again.
+@Composable
+private fun DeckChip(name: String, onRemove: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(start = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlyphIcon(Glyph.File, MaterialTheme.colorScheme.onSurface, size = 20.dp)
+        Text(
+            stringResource(Res.string.setup_deck_attached, name),
+            modifier = Modifier.weight(1f).padding(start = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val remove = stringResource(Res.string.setup_deck_remove)
+        IconButton(onClick = onRemove, modifier = Modifier.semantics { contentDescription = remove }) {
+            GlyphIcon(Glyph.Close, MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
+        }
+    }
+}
+
+// "발표 자료 불러오기" under the memo; after a text file it names the file, and says so when the memo hit the limit.
 @Composable
 private fun FileRow(loadedFile: String?, truncated: Boolean, onPickFile: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

@@ -7,7 +7,9 @@
     <string name="setup_optional">(선택)</string>
     <string name="setup_memo_hint">용어 정리, 슬라이드 내용, 발표 대본 등</string>
     <string name="setup_memo_count">%1$s / %2$s자</string>
-    <string name="setup_memo_file">발표 자료 불러오기 (PPTX · TXT)</string>
+    <string name="setup_memo_file">발표 자료 불러오기</string>
+    <string name="setup_deck_attached">%1$s 첨부됨</string>
+    <string name="setup_deck_remove">첨부한 자료 빼기</string>
     <string name="setup_memo_loaded">%1$s 불러옴</string>
     <string name="setup_memo_truncated">%1$s 불러옴 · %2$s자까지만 넣었어요</string>
     <string name="setup_school_elementary">초등</string>

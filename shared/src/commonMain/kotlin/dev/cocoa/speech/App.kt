@@ -43,7 +43,7 @@ import dev.cocoa.speech.setup.Grade
 import dev.cocoa.speech.setup.GradeStore
 import dev.cocoa.speech.setup.SetupRoute
 import dev.cocoa.speech.setup.TalkSetup
-import dev.cocoa.speech.setup.TextFilePicker
+import dev.cocoa.speech.setup.MaterialPicker
 import dev.cocoa.speech.theme.AppTheme
 import dev.cocoa.speech.theme.motionSchemeEffects
 import dev.cocoa.speech.theme.motionSchemeSpatial
@@ -63,7 +63,7 @@ class LiveDeps(
     val pipeline: LivePipeline,
     val videoRecord: VideoRecordScreen? = null,
     val replayPlayer: ReplayPlayer? = null,
-    val pickTextFile: TextFilePicker? = null,
+    val pickMaterial: MaterialPicker? = null,
     val debugSample: (() -> Recording?)? = null,
     val debugLast: (() -> Recording?)? = null,
 )
@@ -211,7 +211,7 @@ fun App(
                             onBack = ::back,
                             onRecord = live?.let { { setup -> push(record(setup, video = false)) } },
                             onRecordVideo = live?.videoRecord?.let { { setup -> push(record(setup, video = true)) } },
-                            pickTextFile = live?.pickTextFile,
+                            pickMaterial = live?.pickMaterial,
                             onDebugSample = live?.debugSample?.let { load ->
                                 { setup -> load()?.let { push(Screen.Processing(setup, it, fromSample = true)) } }
                             },

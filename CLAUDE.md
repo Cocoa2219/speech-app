@@ -123,9 +123,10 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
 Designed on the "Listener characters" canvas (boards D-M). Flow: onboarding (first run only, flag in `PrefsGradeStore`)
 -> home (past runs grouped by day, FAB "새 발표") -> setup (topic, grade, optional memo; video is the primary button)
 -> record (camera or voice; a refused permission shows a settings screen, camera refused offers voice only) ->
-processing -> results (saved to history when the run finishes). The memo can also be filled from a file (system picker,
-`ActivityTextFilePicker`): a .pptx deck's slide text is extracted on the device (`SlideText`, no library), or a
-plain text file. PDF is not supported (needs a library or a Gemini call). Results from a video run whose scene call failed show
+processing -> results (saved to history when the run finishes). "발표 자료 불러오기" (system picker, `ActivityMaterialPicker`) takes a
+PDF or a text file: a text file fills the memo; a PDF is not read on the device but copied to `files/material/deck.pdf`
+(one kept, replaced on the next pick) to be sent to Gemini with the run once the prompts take notes (not wired yet).
+PPTX is not accepted: Gemini documents PDF only, and on-device conversion needs a paid library or a server. Results from a video run whose scene call failed show
 a dismissible notice instead of an error.
 
 ### Grade
