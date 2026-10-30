@@ -18,7 +18,7 @@ import kotlin.coroutines.cancellation.CancellationException
 
 // Camera recording: the shared record screen with a live rear-camera preview filling the screen.
 @Composable
-fun VideoRecordRoute(permission: Permission, onFinished: (Recording) -> Unit, onCancel: () -> Unit) {
+fun VideoRecordRoute(permission: Permission, onFinished: (Recording) -> Unit, onCancel: () -> Unit, onVoiceOnly: () -> Unit) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val capture = remember { CameraCapture(context) }
@@ -29,6 +29,7 @@ fun VideoRecordRoute(permission: Permission, onFinished: (Recording) -> Unit, on
         permission = permission,
         onFinished = onFinished,
         onCancel = onCancel,
+        onVoiceOnly = onVoiceOnly,
         preview = {
             val previewView = remember { PreviewView(context) }
             LaunchedEffect(previewView) {

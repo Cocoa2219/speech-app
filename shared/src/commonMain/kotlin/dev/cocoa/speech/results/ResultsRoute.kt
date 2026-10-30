@@ -49,6 +49,7 @@ fun ResultsRoute(
     onRecordAgain: (() -> Unit)? = null,
     replay: ReplayMedia? = null,
     player: ReplayPlayer? = null,
+    topic: String? = null,
 ) {
     var attempt by remember { mutableIntStateOf(0) }
     val state by produceState<ResultsUiState>(live?.let { ResultsUiState.Loaded(it) } ?: ResultsUiState.Loading, attempt, live) {
@@ -83,5 +84,6 @@ fun ResultsRoute(
         onRetry = { attempt++ },
         onBack = onBack,
         onRecordAgain = onRecordAgain,
+        topic = topic,
     )
 }

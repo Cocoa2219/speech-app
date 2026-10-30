@@ -3,12 +3,13 @@ package dev.cocoa.speech
 import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import dev.cocoa.speech.gemini.createGemini
+import dev.cocoa.speech.history.DeviceClock
+import dev.cocoa.speech.history.FileHistoryStore
 import dev.cocoa.speech.pipeline.LivePipeline
 import dev.cocoa.speech.record.AndroidAudioRecorder
 import dev.cocoa.speech.record.Recording
@@ -29,7 +30,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val gradeStore = PrefsGradeStore(applicationContext)
-        // Both launchers must be registered here, before the activity starts.
+        val history = FileHistoryStore(File(filesDir, "history"))
+        // The launchers must be registered here, before the activity starts.
+        val textPicker = ActivityTextFilePicker(this)
         val micPermission = ActivityPermission(this, arrayOf(Manifest.permission.RECORD_AUDIO))
         val cameraPermission = ActivityPermission(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
         // Demo only: the key is compiled into the APK from local.properties (see androidApp/build.gradle.kts).
@@ -41,13 +44,20 @@ class MainActivity : ComponentActivity() {
             recorder = AndroidAudioRecorder(applicationContext),
             micPermission = micPermission,
             pipeline = LivePipeline(gemini.generator, uploader = gemini.files, cache = gemini.cache),
-            videoRecord = { onFinished, onCancel -> VideoRecordRoute(cameraPermission, onFinished, onCancel) },
+            videoRecord = { onFinished, onCancel, onVoiceOnly -> VideoRecordRoute(cameraPermission, onFinished, onCancel, onVoiceOnly) },
             replayPlayer = { media, seek, onPosition -> AndroidReplayPlayer(media, seek, onPosition) },
+            pickTextFile = textPicker::pick,
             debugSample = if (BuildConfig.DEBUG) ::loadDebugSample else null,
             debugLast = if (BuildConfig.DEBUG) { { ReplayFiles.last(ReplayFiles.dir(this)) } } else null,
         )
         setContent {
-            App(gradeStore, live, backHandler = { enabled, onBack -> BackHandler(enabled, onBack) })
+            App(
+                gradeStore,
+                live,
+                history = history,
+                clock = DeviceClock,
+                onboarding = gradeStore,
+            )
         }
     }
 

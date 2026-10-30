@@ -20,6 +20,15 @@ interface Capture {
 // A runtime permission request (microphone, or camera plus microphone). Android: ActivityResult launchers in androidApp.
 interface Permission {
     suspend fun request(): Boolean
+
+    // Checks without asking, e.g. after the user comes back from the settings screen.
+    fun granted(): Boolean = false
+
+    // True when the microphone itself is refused; a camera request then cannot fall back to voice only.
+    fun microphoneDenied(): Boolean = true
+
+    // Opens this app's page in the system settings, where a refused permission can be turned on.
+    fun openSettings() {}
 }
 
 // audio always feeds the pipeline; video (camera recordings) adds the scene timeline when present. replay is the

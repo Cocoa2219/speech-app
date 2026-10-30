@@ -106,6 +106,13 @@ import speech_app.shared.generated.resources.results_retry
 import speech_app.shared.generated.resources.results_scrubber
 import speech_app.shared.generated.resources.results_title
 import speech_app.shared.generated.resources.results_video_failed
+import speech_app.shared.generated.resources.results_video_failed_title
+import speech_app.shared.generated.resources.results_dismiss
+import dev.cocoa.speech.theme.Glyph
+import dev.cocoa.speech.theme.GlyphIcon
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -134,9 +141,10 @@ fun ResultsScreen(
     onBack: () -> Unit,
     onRecordAgain: (() -> Unit)? = null,
     replayPlayer: (@Composable () -> Unit)? = null,
+    topic: String? = null,
 ) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
-        ResultsHeader(grade, isExample, (state as? ResultsUiState.Loaded)?.report, onBack)
+        ResultsHeader(grade, isExample, (state as? ResultsUiState.Loaded)?.report, topic, onBack)
         when (state) {
             ResultsUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ExpressiveLoading() }
             ResultsUiState.Failed -> ResultsError(onRetry)
@@ -150,9 +158,10 @@ fun ResultsScreen(
 private fun ExpressiveLoading() = LoadingIndicator()
 
 @Composable
-private fun ResultsHeader(grade: String, isExample: Boolean, report: ResultsReport?, onBack: () -> Unit) {
+private fun ResultsHeader(grade: String, isExample: Boolean, report: ResultsReport?, topic: String?, onBack: () -> Unit) {
     val basis = stringResource(Res.string.results_grade_basis, grade)
     val subtitle = buildString {
+        if (!topic.isNullOrBlank()) append(topic).append(" · ")
         append(basis)
         if (report != null) {
             append(" · ").append(formatTime(report.durationSeconds))
@@ -210,15 +219,8 @@ private fun ColumnScope.ResultsContent(
         }
     }
 
-    if (report.video == VideoStatus.FAILED) {
-        Text(
-            stringResource(Res.string.results_video_failed),
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-        )
-    }
     ReplayArea(report.segments, position, replayPlayer)
+    if (report.video == VideoStatus.FAILED) VideoFailedNotice()
     Scrubber(
         events = report.events,
         pace = report.pace,
@@ -265,6 +267,36 @@ private fun ColumnScope.ResultsContent(
         )
     }
 }
+
+// Canvas board M: video was recorded but its analysis failed, so the run went on audio only (CLAUDE.md failure rule).
+// The results are complete for what was said; one dismissible notice says the screen was not seen. Not an error.
+@Composable
+private fun VideoFailedNotice() {
+    var shown by remember { mutableStateOf(true) }
+    AnimatedVisibility(shown, exit = shrinkVertically() + fadeOut()) {
+        Row(
+            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).fillMaxWidth()
+                .background(NoticeContainer, RoundedCornerShape(20.dp))
+                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            GlyphIcon(Glyph.CameraOff, NoticeText)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(Res.string.results_video_failed_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = NoticeTitle)
+                Text(stringResource(Res.string.results_video_failed), style = MaterialTheme.typography.bodySmall, color = NoticeText)
+            }
+            val dismiss = stringResource(Res.string.results_dismiss)
+            IconButton(onClick = { shown = false }, modifier = Modifier.semantics { contentDescription = dismiss }) {
+                GlyphIcon(Glyph.Close, NoticeText, size = 16.dp)
+            }
+        }
+    }
+}
+
+private val NoticeContainer = Color(0xFFFCEFD9)
+private val NoticeTitle = Color(0xFF5C3804)
+private val NoticeText = Color(0xFF7A4A06)
 
 // Dark replay area: the player when there is a recording, with the sentence being said shown as a subtitle.
 @Composable

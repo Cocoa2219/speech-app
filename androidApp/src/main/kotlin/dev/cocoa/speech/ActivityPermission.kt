@@ -1,6 +1,10 @@
 package dev.cocoa.speech
 
+import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -17,10 +21,20 @@ class ActivityPermission(private val activity: ComponentActivity, private val pe
     }
 
     override suspend fun request(): Boolean {
-        if (permissions.all(::isGranted)) return true
+        if (granted()) return true
         val result = CompletableDeferred<Boolean>().also { pending = it }
         launcher.launch(permissions)
         return result.await()
+    }
+
+    override fun granted(): Boolean = permissions.all(::isGranted)
+
+    override fun microphoneDenied(): Boolean = !isGranted(Manifest.permission.RECORD_AUDIO)
+
+    override fun openSettings() {
+        activity.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)),
+        )
     }
 
     private fun isGranted(permission: String) =

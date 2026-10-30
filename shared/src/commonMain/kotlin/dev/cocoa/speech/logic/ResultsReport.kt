@@ -5,9 +5,11 @@ import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.model.PersonaEvent
 import dev.cocoa.speech.model.Segment
 import dev.cocoa.speech.model.Visual
+import kotlinx.serialization.Serializable
 
 // Whether the scene timeline from video fed this report. FAILED means video was recorded but its analysis failed and
 // the results are audio-only (CLAUDE.md failure handling); the UI should say so.
+@Serializable
 enum class VideoStatus { NONE, USED, FAILED }
 
 // Everything the results screen shows, computed once from analyzer output and persona events.
@@ -41,6 +43,29 @@ data class ResultsReport(
                 heatmap = FixRanking.heatmap(grounded, duration, HEATMAP_BINS),
                 pace = PaceAnalyzer.analyze(analyzer.segments),
                 visual = analyzer.visual.sortedBy { it.t },
+                video = video,
+            )
+        }
+
+        // Rebuilds a report from a saved run (history). Its events were grounded when the run finished, so this skips
+        // quote validation, which needs the full analyzer output.
+        fun restore(
+            durationSeconds: Double,
+            segments: List<Segment>,
+            events: List<PersonaEvent>,
+            visual: List<Visual>,
+            video: VideoStatus,
+        ): ResultsReport {
+            val sorted = events.sortedBy { it.t }
+            return ResultsReport(
+                durationSeconds = durationSeconds,
+                segments = segments.sortedBy { it.tStart },
+                events = sorted,
+                fixes = FixRanking.rank(sorted),
+                questions = sorted.filter { it.persona == Persona.KID && !it.question.isNullOrBlank() },
+                heatmap = FixRanking.heatmap(sorted, durationSeconds, HEATMAP_BINS),
+                pace = PaceAnalyzer.analyze(segments),
+                visual = visual.sortedBy { it.t },
                 video = video,
             )
         }

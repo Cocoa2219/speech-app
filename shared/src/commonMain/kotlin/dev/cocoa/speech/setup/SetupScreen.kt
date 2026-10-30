@@ -1,68 +1,70 @@
 package dev.cocoa.speech.setup
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import dev.cocoa.speech.listeners.AnimatedListenerAvatar
-import dev.cocoa.speech.model.Persona
 import dev.cocoa.speech.theme.Glyph
 import dev.cocoa.speech.theme.GlyphIcon
-import dev.cocoa.speech.theme.motionSchemeSpatial
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import speech_app.shared.generated.resources.Res
-import speech_app.shared.generated.resources.persona_classmate
-import speech_app.shared.generated.resources.persona_kid
-import speech_app.shared.generated.resources.persona_teacher
-import speech_app.shared.generated.resources.role_classmate
-import speech_app.shared.generated.resources.role_kid
-import speech_app.shared.generated.resources.role_teacher
+import speech_app.shared.generated.resources.setup_back
 import speech_app.shared.generated.resources.setup_debug_last
 import speech_app.shared.generated.resources.setup_debug_sample
 import speech_app.shared.generated.resources.setup_grade_hint
 import speech_app.shared.generated.resources.setup_grade_label
-import speech_app.shared.generated.resources.setup_no_key
+import speech_app.shared.generated.resources.setup_memo
+import speech_app.shared.generated.resources.setup_memo_count
+import speech_app.shared.generated.resources.setup_memo_file
+import speech_app.shared.generated.resources.setup_memo_loaded
+import speech_app.shared.generated.resources.setup_memo_truncated
+import speech_app.shared.generated.resources.setup_memo_hint
+import speech_app.shared.generated.resources.setup_optional
 import speech_app.shared.generated.resources.setup_record
 import speech_app.shared.generated.resources.setup_record_video
 import speech_app.shared.generated.resources.setup_school_adult
@@ -70,105 +72,225 @@ import speech_app.shared.generated.resources.setup_school_elementary
 import speech_app.shared.generated.resources.setup_school_group
 import speech_app.shared.generated.resources.setup_school_high
 import speech_app.shared.generated.resources.setup_school_middle
-import speech_app.shared.generated.resources.setup_show_example
 import speech_app.shared.generated.resources.setup_title
+import speech_app.shared.generated.resources.setup_topic
+import speech_app.shared.generated.resources.setup_topic_hint
 import speech_app.shared.generated.resources.setup_year
 import speech_app.shared.generated.resources.setup_year_group
 
-// Owns the grade state and persistence; the screen below stays stateless.
-// onRecord is null when there is no API key; only the example can be shown then.
+// What the student set up before recording. The topic names the history entry; the memo is kept with the run.
+// TODO: pass memo to the analyzer and persona prompts (CLAUDE.md open question "자료/메모"); not wired yet.
+data class TalkSetup(val grade: String, val topic: String = "", val memo: String = "")
+
+const val MEMO_MAX_CHARS = 2000
+
+// Opens the platform file picker and hands back the file's name and its text: a PowerPoint deck's slide text
+// (SlideText) or a plain text file. Nothing happens if the user cancels or the file cannot be read.
+typealias TextFilePicker = (onPicked: (name: String, text: String) -> Unit) -> Unit
+
+// A loaded file is added after what is already in the memo, and the whole memo is cut at the limit.
+internal fun mergeMemo(memo: String, text: String): String =
+    (if (memo.isBlank()) text.trim() else memo.trimEnd() + "\n\n" + text.trim()).take(MEMO_MAX_CHARS)
+
+// Owns the grade (persisted), topic and memo; the screen below stays stateless.
+// onRecord is null when there is no API key; home does not open setup then.
 @Composable
 fun SetupRoute(
     store: GradeStore,
-    onRecord: ((grade: String) -> Unit)?,
-    onShowExample: () -> Unit,
-    onRecordVideo: ((grade: String) -> Unit)? = null,
-    onDebugSample: ((grade: String) -> Unit)? = null,
-    onDebugLast: ((grade: String) -> Unit)? = null,
+    onBack: () -> Unit,
+    onRecord: ((TalkSetup) -> Unit)?,
+    onRecordVideo: ((TalkSetup) -> Unit)? = null,
+    pickTextFile: TextFilePicker? = null,
+    onDebugSample: ((TalkSetup) -> Unit)? = null,
+    onDebugLast: ((TalkSetup) -> Unit)? = null,
 ) {
-    var grade by remember { mutableStateOf(Grade.resolve(store.load())) }
+    // Saveable, so coming back from the record screen keeps what was typed.
+    var grade by rememberSaveable { mutableStateOf(Grade.resolve(store.load())) }
+    var topic by rememberSaveable { mutableStateOf("") }
+    var memo by rememberSaveable { mutableStateOf("") }
+    var loadedFile by rememberSaveable { mutableStateOf<String?>(null) }
+    var truncated by rememberSaveable { mutableStateOf(false) }
+    val setup = { TalkSetup(grade, topic.trim(), memo.trim()) }
     SetupScreen(
         grade = grade,
+        topic = topic,
+        memo = memo,
         onGradeSelected = {
             grade = it
             store.save(it)
         },
-        onRecord = onRecord?.let { record -> { record(grade) } },
-        onShowExample = onShowExample,
-        onRecordVideo = onRecordVideo?.let { record -> { record(grade) } },
-        onDebugSample = onDebugSample?.let { sample -> { sample(grade) } },
-        onDebugLast = onDebugLast?.let { last -> { last(grade) } },
+        onTopicChange = { topic = it },
+        onMemoChange = { memo = it.take(MEMO_MAX_CHARS) },
+        loadedFile = loadedFile,
+        truncated = truncated,
+        onPickFile = pickTextFile?.let { pick ->
+            {
+                pick { name, text ->
+                    truncated = (memo.length + text.length) > MEMO_MAX_CHARS
+                    memo = mergeMemo(memo, text)
+                    loadedFile = name
+                }
+            }
+        },
+        onBack = onBack,
+        onRecord = onRecord?.let { record -> { record(setup()) } },
+        onRecordVideo = onRecordVideo?.let { record -> { record(setup()) } },
+        onDebugSample = onDebugSample?.let { sample -> { sample(setup()) } },
+        onDebugLast = onDebugLast?.let { last -> { last(setup()) } },
     )
 }
 
-// Designed on the "Listener characters" canvas, board E: the three listeners greet, the grade is a school (joined
-// buttons) then a year (pills), and the actions sit at the bottom. Everything above the actions scrolls on short screens.
+// Canvas board K: topic, then the grade as a school (joined buttons) and a year (pills), then optional notes that
+// open from a dashed button. The actions stay at the bottom; everything above scrolls, and moves up with the keyboard.
 @Composable
 fun SetupScreen(
     grade: String,
+    topic: String,
+    memo: String,
     onGradeSelected: (String) -> Unit,
+    onTopicChange: (String) -> Unit,
+    onMemoChange: (String) -> Unit,
+    onBack: () -> Unit,
+    loadedFile: String? = null,
+    truncated: Boolean = false,
+    onPickFile: (() -> Unit)? = null,
     onRecord: (() -> Unit)?,
-    onShowExample: () -> Unit,
     onRecordVideo: (() -> Unit)? = null,
     onDebugSample: (() -> Unit)? = null,
     onDebugLast: (() -> Unit)? = null,
 ) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding().padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 40.dp, bottom = 16.dp)) {
-            Text(
-                stringResource(Res.string.setup_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            ListenerCast(Modifier.padding(top = 24.dp))
-            GradePicker(grade, onGradeSelected, Modifier.padding(top = 28.dp))
+    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            val back = stringResource(Res.string.setup_back)
+            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = back }) {
+                GlyphIcon(Glyph.Back, MaterialTheme.colorScheme.onSurface, size = 24.dp)
+            }
+            Text(stringResource(Res.string.setup_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
-        Actions(onRecord, onShowExample, onRecordVideo, onDebugSample, onDebugLast)
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(26.dp),
+        ) {
+            TopicField(topic, onTopicChange)
+            GradePicker(grade, onGradeSelected)
+            MemoField(memo, onMemoChange, loadedFile, truncated, onPickFile)
+        }
+        Actions(onRecord, onRecordVideo, onDebugSample, onDebugLast)
     }
 }
 
-// Tapping a listener makes them raise a hand, the same morph as on the results screen.
 @Composable
-private fun ListenerCast(modifier: Modifier) {
-    val waving = remember { mutableStateMapOf<Persona, Boolean>() }
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 18.dp, bottom = 16.dp)) {
-            for (persona in Persona.entries) {
-                val up = waving[persona] == true
-                val scale by animateFloatAsState(if (up) 1.08f else 1f, MaterialTheme.motionSchemeSpatial(), label = "wave")
-                val name = stringResource(personaName(persona))
-                val role = stringResource(personaRole(persona))
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .clickable(role = Role.Button) { waving[persona] = !up }
-                        .semantics { contentDescription = "$name, $role" },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    AnimatedListenerAvatar(
-                        persona,
-                        up,
-                        Modifier.size(84.dp).graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        },
-                    )
-                    Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        role,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = Color.White,
+    unfocusedContainerColor = Color.White,
+    focusedBorderColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedBorderColor = Color.Transparent,
+)
+
+@Composable
+private fun SectionLabel(label: StringResource, optional: Boolean = false, trailing: String? = null) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            stringResource(label),
+            modifier = Modifier.alignByBaseline(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        if (optional) {
+            Text(
+                " " + stringResource(Res.string.setup_optional),
+                modifier = Modifier.alignByBaseline(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        if (trailing != null) {
+            Text(
+                trailing,
+                modifier = Modifier.alignByBaseline(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TopicField(topic: String, onChange: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel(Res.string.setup_topic)
+        OutlinedTextField(
+            value = topic,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(stringResource(Res.string.setup_topic_hint)) },
+            singleLine = true,
+            shape = RoundedCornerShape(18.dp),
+            colors = fieldColors(),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+        )
+    }
+}
+
+// Always open: a text box with a character count, and the file button under it.
+@Composable
+private fun MemoField(
+    memo: String,
+    onChange: (String) -> Unit,
+    loadedFile: String?,
+    truncated: Boolean,
+    onPickFile: (() -> Unit)?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel(
+            Res.string.setup_memo,
+            optional = true,
+            trailing = stringResource(Res.string.setup_memo_count, memo.length.toString(), "2,000"),
+        )
+        OutlinedTextField(
+            value = memo,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+            placeholder = { Text(stringResource(Res.string.setup_memo_hint)) },
+            minLines = 4,
+            maxLines = 10,
+            shape = RoundedCornerShape(18.dp),
+            colors = fieldColors(),
+        )
+        if (onPickFile != null) FileRow(loadedFile, truncated, onPickFile)
+    }
+}
+
+// "발표 자료 불러오기" under the memo; after a load it names the file, and says so when the memo hit the limit.
+@Composable
+private fun FileRow(loadedFile: String?, truncated: Boolean, onPickFile: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = onPickFile, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            GlyphIcon(Glyph.File, MaterialTheme.colorScheme.onSurface, size = 20.dp)
+            Text(
+                stringResource(Res.string.setup_memo_file),
+                modifier = Modifier.padding(start = 6.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        if (loadedFile != null) {
+            Text(
+                if (truncated) stringResource(Res.string.setup_memo_truncated, loadedFile, "2,000")
+                else stringResource(Res.string.setup_memo_loaded, loadedFile),
+                modifier = Modifier.weight(1f).padding(start = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun GradePicker(grade: String, onGradeSelected: (String) -> Unit, modifier: Modifier) {
+private fun GradePicker(grade: String, onGradeSelected: (String) -> Unit) {
     val school = Grade.schoolOf(grade)
     val year = Grade.yearOf(grade)
     val levels: List<Pair<Grade.School?, StringResource>> = Grade.schools.zip(
@@ -177,8 +299,8 @@ private fun GradePicker(grade: String, onGradeSelected: (String) -> Unit, modifi
     val schoolGroup = stringResource(Res.string.setup_school_group)
     val yearGroup = stringResource(Res.string.setup_year_group)
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(Res.string.setup_grade_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionLabel(Res.string.setup_grade_label)
         // Joined buttons: outer corners round, inner ones tight; the selected one turns fully round.
         Row(
             Modifier.fillMaxWidth().semantics { contentDescription = schoolGroup },
@@ -267,30 +389,17 @@ private fun GradePicker(grade: String, onGradeSelected: (String) -> Unit, modifi
 @Composable
 private fun Actions(
     onRecord: (() -> Unit)?,
-    onShowExample: () -> Unit,
     onRecordVideo: (() -> Unit)?,
     onDebugSample: (() -> Unit)?,
     onDebugLast: (() -> Unit)?,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (onRecord != null) {
-            // Video is the main path (listeners react to what is shown); voice only is the fallback.
-            if (onRecordVideo != null) {
-                PrimaryAction(Glyph.Camera, Res.string.setup_record_video, onRecordVideo)
-                SecondaryAction(Glyph.Mic, Res.string.setup_record, onRecord)
-            } else {
-                PrimaryAction(Glyph.Mic, Res.string.setup_record, onRecord)
-            }
-        } else {
-            Text(
-                stringResource(Res.string.setup_no_key),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Mock mode (Layer 0): fixture results, no network. Also the demo safety net.
-        TextButton(onClick = onShowExample, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            Text(stringResource(Res.string.setup_show_example), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Video is the main path (listeners react to what is shown); voice only is the fallback.
+        if (onRecordVideo != null) {
+            PrimaryAction(Glyph.Camera, Res.string.setup_record_video, onRecordVideo)
+            onRecord?.let { SecondaryAction(Glyph.Mic, Res.string.setup_record, it) }
+        } else if (onRecord != null) {
+            PrimaryAction(Glyph.Mic, Res.string.setup_record, onRecord)
         }
         // Debug builds only.
         if (onDebugSample != null || onDebugLast != null) {
@@ -338,16 +447,4 @@ private fun DebugButton(label: StringResource, onClick: () -> Unit, modifier: Mo
             textAlign = TextAlign.Center,
         )
     }
-}
-
-private fun personaName(persona: Persona) = when (persona) {
-    Persona.CLASSMATE -> Res.string.persona_classmate
-    Persona.TEACHER -> Res.string.persona_teacher
-    Persona.KID -> Res.string.persona_kid
-}
-
-private fun personaRole(persona: Persona) = when (persona) {
-    Persona.CLASSMATE -> Res.string.role_classmate
-    Persona.TEACHER -> Res.string.role_teacher
-    Persona.KID -> Res.string.role_kid
 }

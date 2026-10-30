@@ -26,6 +26,8 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
   Pretendard v1.3.9 (SIL OFL 1.1, four bundled weights in `composeResources/font`, license in
   `composeResources/files/licenses`); do not fall back to the system font. Listener colors are fixed
   (`ListenerColors`), not themed.
+- Navigation: Navigation 3 (`org.jetbrains.androidx.navigation3:navigation3-ui` 1.1.2, added 2026-10-30 at the
+  developer's request). The back stack lives in `App.kt`; back never returns to processing or a finished recording.
 - Gemini API for everything AI: transcription, video understanding, analyzer and persona calls (structured JSON output).
 - **No backend server.** Calls go straight from the app. Keep the API key out of git (`local.properties` / BuildConfig);
   a shipped APK would expose it, so this is demo-only.
@@ -116,6 +118,16 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
       was never said, so a miss must not raise a hand.
 - Logs carry step ids and times only, never transcript text.
 
+### Screens
+
+Designed on the "Listener characters" canvas (boards D-M). Flow: onboarding (first run only, flag in `PrefsGradeStore`)
+-> home (past runs grouped by day, FAB "새 발표") -> setup (topic, grade, optional memo; video is the primary button)
+-> record (camera or voice; a refused permission shows a settings screen, camera refused offers voice only) ->
+processing -> results (saved to history when the run finishes). The memo can also be filled from a file (system picker,
+`ActivityTextFilePicker`): a .pptx deck's slide text is extracted on the device (`SlideText`, no library), or a
+plain text file. PDF is not supported (needs a library or a Gemini call). Results from a video run whose scene call failed show
+a dismissible notice instead of an error.
+
 ### Grade
 
 The listener grade fills `{{grade}}` in `prompts/analyzer.md` (via `PromptTemplate.analyzer`). It comes from the grade
@@ -133,7 +145,7 @@ the default, because the fixtures were written for it.
 - **Layer 2, video**: scene timeline, visual mismatches, video replay with synced pins.
 - **Layer 3, stretch (only if ahead at the Day 4 checkpoint)**: second framing option, keyframe zoom / targeted re-look
   with higher fps around "here / this", low-confidence word check and transcript editor.
-- **Deferred**: custom personas, history, extra preset personas, live/streaming feedback, PDF slide import,
+- **Deferred**: custom personas, extra preset personas, live/streaming feedback, PDF slide import,
   body-language scoring.
 
 Model: one Flash model for every stage (audio/video input, structured outputs), set in
@@ -154,7 +166,10 @@ to end on a 60 s clip.
   sent inline with `store: false`. Video goes through the Files API and is deleted there right after the scene call.
   Replay (developer decision, 2026-10-29): the latest recording (audio or video) is kept in app-private storage
   (`files/replay`, `ReplayFiles`) so the results screen can replay it with synced pins; only one is kept, and starting
-  a new recording deletes it. `allowBackup` is off. Otherwise keep only transcript, pins, and report on the device. No
+  a new recording deletes it. `allowBackup` is off. Otherwise keep only transcript, pins, and report on the device:
+  history (home screen) is one JSON file per run in `files/history` (`HistoryEntry`, `FileHistoryStore`) holding the
+  topic, grade, memo, transcript segments, grounded events and visuals, never media; only the newest entry may use the
+  kept recording. No
   accounts. Never send audio, video, or transcripts to analytics or logs. Check consent rules for minors before any
   public release.
 - **Tone**: critique the explanation, never the student. No labels like "nervous" or "unconfident".
@@ -212,8 +227,9 @@ that take device paths like `/sdcard/...`, or Git Bash rewrites them.
 ## Open questions
 
 - Optional "자료/메모" at setup: the student's notes or sources. Planned use: vocabulary hints for transcription,
-  terms the student already introduced, and the only allowed source of concrete facts in fixes. Needs a pipeline change
-  (a notes input to the analyzer and persona prompts).
+  terms the student already introduced, and the only allowed source of concrete facts in fixes. The setup field exists
+  (`TalkSetup.memo`, saved with the run) but is NOT sent to the model yet: needs a pipeline change (a notes input to the
+  analyzer and persona prompts).
 - Kid persona is observational only (no voice Q&A). Add tap-to-answer later?
 - Framing: start with room view (presenter + screen) only, or also a screen-only option?
 - Is per-word confidence available from the transcription model? If not, how do we mark uncertain words?

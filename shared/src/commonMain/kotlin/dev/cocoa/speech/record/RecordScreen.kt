@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,7 +83,6 @@ import speech_app.shared.generated.resources.record_listen_recording
 import speech_app.shared.generated.resources.record_min_hint
 import speech_app.shared.generated.resources.record_pause
 import speech_app.shared.generated.resources.record_paused
-import speech_app.shared.generated.resources.record_permission_denied
 import speech_app.shared.generated.resources.record_ready
 import speech_app.shared.generated.resources.record_recording
 import speech_app.shared.generated.resources.record_resume
@@ -103,16 +103,26 @@ fun RecordRoute(
     onFinished: (Recording) -> Unit,
     onCancel: () -> Unit,
     preview: (@Composable () -> Unit)? = null,
+    onVoiceOnly: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     var granted by remember { mutableStateOf(false) }
+    var denied by remember { mutableStateOf(false) }
     var phase by remember { mutableStateOf(RecordPhase.IDLE) }
     var elapsed by remember { mutableDoubleStateOf(0.0) }
     var problem by remember { mutableStateOf<StringResource?>(null) }
 
     LaunchedEffect(permission) {
         granted = permission.request()
-        if (!granted) problem = Res.string.record_permission_denied
+        denied = !granted
+    }
+    // Coming back from the settings screen: pick up a permission turned on there.
+    LifecycleResumeEffect(permission) {
+        if (denied && permission.granted()) {
+            granted = true
+            denied = false
+        }
+        onPauseOrDispose {}
     }
     DisposableEffect(capture) { onDispose { capture.cancel() } }
 
@@ -139,6 +149,17 @@ fun RecordRoute(
             if (elapsed >= RecordLimits.MAX_SECONDS) finish()
             delay(100)
         }
+    }
+
+    if (denied) {
+        val camera = preview != null && !permission.microphoneDenied()
+        PermissionScreen(
+            camera = camera,
+            onOpenSettings = permission::openSettings,
+            onVoiceOnly = if (camera) onVoiceOnly else null,
+            onClose = onCancel,
+        )
+        return
     }
 
     RecordScreen(

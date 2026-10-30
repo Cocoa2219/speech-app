@@ -1,6 +1,8 @@
 package dev.cocoa.speech.results
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,12 +39,13 @@ import speech_app.shared.generated.resources.results_no_hands_title
 import speech_app.shared.generated.resources.results_record_again
 
 // Canvas board H: no hand went up. Each check line is true by construction (that listener raised no hand), so it is
-// not praise the model made up, and it says nothing about whether the content is correct.
+// not praise the model made up, and it says nothing about whether the content is correct. Scrolls when a notice above
+// (video failed) leaves less room.
 @Composable
 internal fun NoHands(grade: String, onRecordAgain: (() -> Unit)?, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         Column(
-            Modifier.weight(1f).fillMaxWidth().padding(top = 24.dp),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {

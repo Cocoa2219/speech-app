@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 
 // The few line icons the screens need, drawn in a 24x24 box (no icon dependency). Decorative: the button they sit in
 // carries the label.
-enum class Glyph { Mic, Camera, Close, Check, Pause }
+enum class Glyph { Mic, Camera, CameraOff, Close, Check, Pause, Plus, Back, File }
 
 @Composable
 fun GlyphIcon(glyph: Glyph, color: Color, size: Dp = 22.dp, modifier: Modifier = Modifier) {
@@ -34,7 +34,14 @@ fun GlyphIcon(glyph: Glyph, color: Color, size: Dp = 22.dp, modifier: Modifier =
                 drawRoundRect(color, Offset(3f * u, 6.5f * u), Size(13f * u, 11f * u), CornerRadius(3f * u), style = line)
                 drawPath(path(u, "M 16 10.5 L 21 7.5 L 21 16.5 L 16 13.5"), color, style = line)
             }
+            Glyph.CameraOff -> {
+                drawRoundRect(color, Offset(3f * u, 6.5f * u), Size(13f * u, 11f * u), CornerRadius(3f * u), style = line)
+                drawPath(path(u, "M 16 10.5 L 21 7.5 L 21 16.5 L 16 13.5 M 3 4 L 21 20"), color, style = line)
+            }
             Glyph.Close -> drawPath(path(u, "M 6 6 L 18 18 M 18 6 L 6 18"), color, style = line)
+            Glyph.Plus -> drawPath(path(u, "M 12 5 L 12 19 M 5 12 L 19 12"), color, style = line)
+            Glyph.File -> drawPath(path(u, "M 6 3 L 14 3 L 19 8 L 19 21 L 6 21 L 6 3 M 14 3 L 14 8 L 19 8 M 9 13 L 16 13 M 9 17 L 14 17"), color, style = line)
+            Glyph.Back -> drawPath(path(u, "M 15 5 L 8 12 L 15 19"), color, style = Stroke(2.2f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
             Glyph.Check -> drawPath(path(u, "M 5 12.5 L 10 17.5 L 19 7"), color, style = Stroke(2.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
             Glyph.Pause -> {
                 drawRoundRect(color, Offset(6f * u, 5f * u), Size(4f * u, 14f * u), CornerRadius(1.6f * u))

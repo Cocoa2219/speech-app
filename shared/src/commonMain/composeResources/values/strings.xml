@@ -1,5 +1,15 @@
 <resources>
-    <string name="setup_title">발표 준비</string>
+    <string name="setup_title">새 발표 연습</string>
+    <string name="setup_back">뒤로</string>
+    <string name="setup_topic">주제</string>
+    <string name="setup_topic_hint">예: 광합성</string>
+    <string name="setup_memo">자료 · 메모</string>
+    <string name="setup_optional">(선택)</string>
+    <string name="setup_memo_hint">용어 정리, 슬라이드 내용, 발표 대본 등</string>
+    <string name="setup_memo_count">%1$s / %2$s자</string>
+    <string name="setup_memo_file">발표 자료 불러오기 (PPTX · TXT)</string>
+    <string name="setup_memo_loaded">%1$s 불러옴</string>
+    <string name="setup_memo_truncated">%1$s 불러옴 · %2$s자까지만 넣었어요</string>
     <string name="setup_school_elementary">초등</string>
     <string name="setup_school_middle">중학교</string>
     <string name="setup_school_high">고등</string>
@@ -7,12 +17,8 @@
     <string name="setup_school_group">학교</string>
     <string name="setup_year">%1$s학년</string>
     <string name="setup_year_group">학년</string>
-    <string name="role_classmate">같은 반 친구</string>
-    <string name="role_teacher">설명을 듣는 선생님</string>
-    <string name="role_kid">호기심 많은 동생</string>
     <string name="setup_grade_label">듣는 사람 학년</string>
     <string name="setup_grade_hint">%1$s 눈높이에서 모를 만한 내용을 찾아요.</string>
-    <string name="setup_show_example">예시 결과 보기</string>
     <string name="setup_record">목소리만 녹음</string>
     <string name="setup_record_video">영상으로 녹화</string>
     <string name="setup_debug_sample">샘플 파일로 분석 (디버그)</string>
@@ -20,6 +26,15 @@
     <string name="setup_no_key">API 키가 없어서 예시 결과만 볼 수 있어요.</string>
 
     <string name="record_title">설명하기</string>
+    <string name="permission_camera_title">카메라를 쓸 수 없어요</string>
+    <string name="permission_mic_title">마이크를 쓸 수 없어요</string>
+    <string name="permission_camera_body">청중이 화면을 보려면 카메라가 필요해요.\n목소리만으로도 연습할 수 있어요.</string>
+    <string name="permission_mic_body">청중이 들으려면 마이크가 필요해요.</string>
+    <string name="permission_how">설정에서 이렇게 켜요</string>
+    <string name="permission_camera_steps">권한 → 카메라 → 앱 사용 중에만 허용</string>
+    <string name="permission_mic_steps">권한 → 마이크 → 앱 사용 중에만 허용</string>
+    <string name="permission_open_settings">설정 열기</string>
+    <string name="permission_voice_only">목소리만 녹음하기</string>
     <string name="record_hint_idle">주제를 소리 내어 설명해 보세요.\n20초부터 3분까지 녹음할 수 있어요.</string>
     <string name="record_start">녹음 시작</string>
     <string name="record_pause">일시정지</string>
@@ -35,7 +50,6 @@
     <string name="record_listen_paused">잠깐 쉬는 중</string>
     <string name="record_finishing">녹음을 마무리하는 중이에요…</string>
     <string name="record_warn">곧 끝나요. 3분이 되면 자동으로 멈춰요.</string>
-    <string name="record_permission_denied">권한이 있어야 녹음할 수 있어요. 설정에서 마이크(영상은 카메라도) 권한을 허용해 주세요.</string>
     <string name="record_failed">녹음을 시작하지 못했어요.</string>
     <string name="record_time_desc">녹음 시간 %1$s, 최대 %2$s</string>
 
@@ -67,7 +81,9 @@
     <string name="results_fix_page">고칠 점 %1$s</string>
     <string name="results_play">재생</string>
     <string name="results_pause">일시정지</string>
-    <string name="results_video_failed">영상 분석에 실패해서 소리만으로 분석했어요.</string>
+    <string name="results_video_failed_title">영상 분석이 실패했어요.</string>
+    <string name="results_video_failed">말한 내용만으로 분석했어요.</string>
+    <string name="results_dismiss">알림 닫기</string>
     <string name="results_pace_average">말하기 속도 평균 %1$s음절/초</string>
     <string name="results_pace_hint">막대가 높을수록 빠르게 말한 구간이에요. 점은 ‘음’, ‘어’ 같은 군말이에요.</string>
     <string name="results_no_hands_title">아무도 손을 들지 않았어요</string>
@@ -83,4 +99,46 @@
     <string name="persona_classmate">친구</string>
     <string name="persona_teacher">선생님</string>
     <string name="persona_kid">동생</string>
+
+    <string name="onboarding_skip">건너뛰기</string>
+    <string name="onboarding_next">다음</string>
+    <string name="onboarding_start">시작하기</string>
+    <string name="onboarding_cast_title">설명을 들어 줄\n청중 셋을 소개할게요</string>
+    <string name="onboarding_cast_body">발표를 녹화하면 세 청중이 보고 들어요.</string>
+    <string name="onboarding_classmate">같은 반 친구.\n나와 같은 눈높이로 들어요.</string>
+    <string name="onboarding_teacher">설명을 듣는 선생님.\n흐름과 근거를 따라가요.</string>
+    <string name="onboarding_kid">호기심 많은 동생.\n궁금하면 바로 물어봐요.</string>
+    <string name="onboarding_hand_title">헷갈리는 순간에\n손을 들어요</string>
+    <string name="onboarding_hand_body">몇 초에서 왜 헷갈렸는지,\n내가 한 말을 그대로 짚어서 알려 줘요.</string>
+    <string name="onboarding_hand_question">“캘빈 회로가 뭐예요?”</string>
+    <string name="onboarding_hand_quote">“캘빈 회로를 거쳐서”</string>
+    <string name="onboarding_promise_title">맞는지가 아니라\n잘 전달되는지만 봐요</string>
+    <string name="onboarding_truth_title">내용이 맞는지는 판단하지 않아요</string>
+    <string name="onboarding_truth_body">청중은 설명이 이해되는지만 봐요.\n고칠 점도 내가 한 말과 화면에 있는 것만 써요.</string>
+    <string name="onboarding_local_title">녹음은 이 휴대폰에만 남아요</string>
+    <string name="onboarding_local_body">다시 보기용으로 가장 최근 녹음 하나만 보관하고, 새로 녹음하면 지워져요.</string>
+    <string name="onboarding_delete_title">분석이 끝나면 바로 지워요</string>
+    <string name="onboarding_delete_body">분석에 보낸 영상과 소리는\n끝나는 즉시 서버에서 삭제해요.</string>
+
+    <string name="home_title">발표 연습</string>
+    <string name="home_new">새 발표</string>
+    <string name="home_new_desc">새 발표 연습하기</string>
+    <string name="home_history">지난 연습</string>
+    <string name="home_example">예시 결과 보기</string>
+    <string name="home_empty_title">아직 연습 기록이 없어요</string>
+    <string name="home_empty_body">아래 ‘새 발표’를 눌러 첫 연습을 시작해 보세요.\n결과는 여기 쌓이고 언제든 다시 열 수 있어요.</string>
+    <string name="home_today">오늘</string>
+    <string name="home_yesterday">어제</string>
+    <string name="home_this_week">이번 주</string>
+    <string name="home_last_week">지난주</string>
+    <string name="home_month">%1$s월</string>
+    <string name="home_year_month">%1$s년 %2$s월</string>
+    <string name="home_replay">다시 보기</string>
+    <string name="home_fixes">고칠 점 %1$s</string>
+    <string name="home_all_clear">모두 이해</string>
+    <string name="home_am">오전 %1$s</string>
+    <string name="home_pm">오후 %1$s</string>
+    <string name="home_date">%1$s월 %2$s일 (%3$s)</string>
+    <string name="home_weekdays">일월화수목금토</string>
+    <string name="home_no_key">API 키가 없어서 새 연습은 할 수 없어요. 예시 결과는 볼 수 있어요.</string>
 </resources>
