@@ -65,7 +65,8 @@ current screens are test scaffolding; a full UI overhaul is planned, spec first.
    dragging; the listener stage (hands rise while playback is at their moments); speech bubbles with the reason or the
    kid's question; a centered pager of the top 3 fixes (choosing one seeks to it); a thin pace graph on the scrubber's time
    axis (a bar per sentence, taller when faster, gaps for pauses, dots for fillers) with the average syllables per
-   second, descriptive only. No separate questions tab or heatmap.
+   second, descriptive only. No separate questions tab or heatmap. When no hand went up (board H), the stage area shows
+   the three listeners nodding, one true-by-construction check line per listener, and "다른 주제로 녹음하기".
 
 ## Transcription notes (verify on Day 1)
 

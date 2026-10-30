@@ -2,8 +2,7 @@ package dev.cocoa.speech.video
 
 import androidx.camera.core.Preview
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -17,7 +16,7 @@ import dev.cocoa.speech.record.RecordRoute
 import dev.cocoa.speech.record.Recording
 import kotlin.coroutines.cancellation.CancellationException
 
-// Camera recording: the shared record screen with a live rear-camera preview above the timer.
+// Camera recording: the shared record screen with a live rear-camera preview filling the screen.
 @Composable
 fun VideoRecordRoute(permission: Permission, onFinished: (Recording) -> Unit, onCancel: () -> Unit) {
     val context = LocalContext.current
@@ -42,7 +41,7 @@ fun VideoRecordRoute(permission: Permission, onFinished: (Recording) -> Unit, on
                     println("CameraCapture: bind failed: ${e::class.simpleName}")
                 }
             }
-            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f))
+            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
         },
     )
 }

@@ -13,7 +13,7 @@
     <string name="setup_grade_label">듣는 사람 학년</string>
     <string name="setup_grade_hint">%1$s 눈높이에서 모를 만한 내용을 찾아요.</string>
     <string name="setup_show_example">예시 결과 보기</string>
-    <string name="setup_record">녹음 시작</string>
+    <string name="setup_record">목소리만 녹음</string>
     <string name="setup_record_video">영상으로 녹화</string>
     <string name="setup_debug_sample">샘플 파일로 분석 (디버그)</string>
     <string name="setup_debug_last">마지막 녹음 다시 분석 (디버그)</string>
@@ -70,6 +70,12 @@
     <string name="results_video_failed">영상 분석에 실패해서 소리만으로 분석했어요.</string>
     <string name="results_pace_average">말하기 속도 평균 %1$s음절/초</string>
     <string name="results_pace_hint">막대가 높을수록 빠르게 말한 구간이에요. 점은 ‘음’, ‘어’ 같은 군말이에요.</string>
+    <string name="results_no_hands_title">아무도 손을 들지 않았어요</string>
+    <string name="results_no_hands_desc">%1$s 눈높이에서\n헷갈린 지점을 찾지 못했어요.</string>
+    <string name="results_no_hands_classmate">모르는 말 없이 따라왔어요</string>
+    <string name="results_no_hands_teacher">주장마다 이유가 있었어요</string>
+    <string name="results_no_hands_kid">“왜요?” 할 곳이 없었어요</string>
+    <string name="results_record_again">다른 주제로 녹음하기</string>
     <string name="results_no_fixes">헷갈린 지점을 찾지 못했어요.</string>
     <string name="results_error">결과를 불러오지 못했어요.</string>
     <string name="results_retry">다시 시도</string>

@@ -106,6 +106,12 @@ fun App(gradeStore: GradeStore, live: LiveDeps?, backHandler: BackHandlerSlot = 
                     grade = s.grade,
                     live = s.live,
                     onBack = home,
+                    // Starts a new recording in the same mode (only after a real run, not the example).
+                    onRecordAgain = if (s.live != null && live != null) {
+                        { screen = if (s.replay?.isVideo == true && live.videoRecord != null) Screen.VideoRecord(s.grade) else Screen.Record(s.grade) }
+                    } else {
+                        null
+                    },
                     replay = s.replay,
                     player = live?.replayPlayer,
                 )

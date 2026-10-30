@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -176,8 +177,8 @@ fun RecordRoute(
 }
 
 // Designed on the "Listener characters" canvas, board F: the listeners listen (bobbing while recording), a big timer
-// over a wavy progress line, and a record button that changes shape. With a camera preview the listeners sit as small
-// faces over it.
+// over a wavy progress line, and a record button that changes shape. With a camera preview the preview fills the screen,
+// with the timer and the listeners as small faces on it.
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun RecordScreen(
@@ -195,51 +196,27 @@ fun RecordScreen(
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopBar(phase, onCancel)
         if (preview != null) {
-            Box(
-                Modifier.padding(horizontal = 24.dp, vertical = 4.dp).weight(1f, fill = false).clip(RoundedCornerShape(28.dp))
-                    .background(ListenerColors.Ink),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                preview()
-                Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (persona in Persona.entries) {
-                        Box(
-                            Modifier.size(52.dp).background(Color.White.copy(alpha = 0.92f), CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ListeningAvatar(persona, listening, Modifier.size(46.dp))
-                        }
-                    }
-                }
-            }
+            VideoStage(phase, elapsed, problem, preview, Modifier.weight(1f))
         } else {
             ListeningStage(phase, Modifier.padding(top = 28.dp))
-        }
-        Column(
-            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
-        ) {
-            when (phase) {
-                RecordPhase.IDLE -> {
-                    TimerText(phase) { 0.0 }
-                    TimeLine(phase) { 0.0 }
-                    Hint(stringResource(Res.string.record_hint_idle))
+            Column(
+                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+            ) {
+                when (phase) {
+                    RecordPhase.IDLE -> {
+                        TimerText(phase) { 0.0 }
+                        TimeLine(phase) { 0.0 }
+                        Hint(stringResource(Res.string.record_hint_idle))
+                    }
+                    RecordPhase.FINISHING -> TimerText(phase, elapsed)
+                    else -> {
+                        TimerText(phase, elapsed)
+                        TimeLine(phase, elapsed)
+                        LimitHint(elapsed)
+                    }
                 }
-                RecordPhase.FINISHING -> TimerText(phase, elapsed)
-                else -> {
-                    TimerText(phase, elapsed)
-                    TimeLine(phase, elapsed)
-                    LimitHint(elapsed)
-                }
-            }
-            if (problem != null) {
-                Text(
-                    stringResource(problem),
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
+                problem?.let { Problem(it) }
             }
         }
         Box(
@@ -260,6 +237,87 @@ fun RecordScreen(
             }
         }
     }
+}
+
+// Video is what the listeners watch, so the preview takes all the room it can at the recorded 3:4 framing. The timer
+// sits on the preview; the listeners are small faces along its bottom edge.
+@Composable
+private fun VideoStage(
+    phase: RecordPhase,
+    elapsed: () -> Double,
+    problem: StringResource?,
+    preview: @Composable () -> Unit,
+    modifier: Modifier,
+) {
+    val listening = phase == RecordPhase.RECORDING
+    Column(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.aspectRatio(3f / 4f).clip(RoundedCornerShape(28.dp)).background(ListenerColors.Ink),
+            ) {
+                preview()
+                VideoTimer(phase, elapsed, Modifier.align(Alignment.TopCenter).padding(top = 14.dp))
+                Row(
+                    Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    for (persona in Persona.entries) {
+                        Box(
+                            Modifier.size(52.dp).background(Color.White.copy(alpha = 0.92f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ListeningAvatar(persona, listening, Modifier.size(46.dp))
+                        }
+                    }
+                }
+            }
+        }
+        when (phase) {
+            RecordPhase.IDLE -> Hint(stringResource(Res.string.record_hint_idle))
+            RecordPhase.FINISHING -> {}
+            else -> {
+                TimeLine(phase, elapsed)
+                LimitHint(elapsed)
+            }
+        }
+        problem?.let { Problem(it) }
+    }
+}
+
+@Composable
+private fun VideoTimer(phase: RecordPhase, elapsed: () -> Double, modifier: Modifier) {
+    val seconds = elapsed()
+    val timeDesc = stringResource(Res.string.record_time_desc, formatTime(seconds), formatTime(RecordLimits.MAX_SECONDS))
+    Row(
+        modifier.background(Color.Black.copy(alpha = 0.55f), CircleShape).padding(horizontal = 14.dp, vertical = 6.dp)
+            .clearAndSetSemantics { contentDescription = timeDesc },
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            formatTime(seconds),
+            modifier = Modifier.alignByBaseline(),
+            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.Bold,
+            color = if (phase == RecordPhase.PAUSED) Color.White.copy(alpha = 0.6f) else Color.White,
+        )
+        Text(
+            " / ${formatTime(RecordLimits.MAX_SECONDS)}",
+            modifier = Modifier.alignByBaseline(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.7f),
+        )
+    }
+}
+
+@Composable
+private fun Problem(problem: StringResource) {
+    Text(
+        stringResource(problem),
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Center,
+    )
 }
 
 @Composable

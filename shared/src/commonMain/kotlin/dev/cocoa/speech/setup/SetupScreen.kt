@@ -274,25 +274,12 @@ private fun Actions(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (onRecord != null) {
-            Button(onClick = onRecord, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                GlyphIcon(Glyph.Mic, MaterialTheme.colorScheme.onPrimary)
-                Text(
-                    stringResource(Res.string.setup_record),
-                    modifier = Modifier.padding(start = 10.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            // Video is the main path (listeners react to what is shown); voice only is the fallback.
             if (onRecordVideo != null) {
-                FilledTonalButton(onClick = onRecordVideo, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                    GlyphIcon(Glyph.Camera, MaterialTheme.colorScheme.onSecondaryContainer)
-                    Text(
-                        stringResource(Res.string.setup_record_video),
-                        modifier = Modifier.padding(start = 10.dp),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
+                PrimaryAction(Glyph.Camera, Res.string.setup_record_video, onRecordVideo)
+                SecondaryAction(Glyph.Mic, Res.string.setup_record, onRecord)
+            } else {
+                PrimaryAction(Glyph.Mic, Res.string.setup_record, onRecord)
             }
         } else {
             Text(
@@ -312,6 +299,32 @@ private fun Actions(
                 onDebugLast?.let { DebugButton(Res.string.setup_debug_last, it, Modifier.weight(1f)) }
             }
         }
+    }
+}
+
+@Composable
+private fun PrimaryAction(glyph: Glyph, label: StringResource, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+        GlyphIcon(glyph, MaterialTheme.colorScheme.onPrimary)
+        Text(
+            stringResource(label),
+            modifier = Modifier.padding(start = 10.dp),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun SecondaryAction(glyph: Glyph, label: StringResource, onClick: () -> Unit) {
+    FilledTonalButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+        GlyphIcon(glyph, MaterialTheme.colorScheme.onSecondaryContainer)
+        Text(
+            stringResource(label),
+            modifier = Modifier.padding(start = 10.dp),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

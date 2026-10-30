@@ -46,6 +46,7 @@ fun ResultsRoute(
     grade: String,
     live: ResultsReport?,
     onBack: () -> Unit,
+    onRecordAgain: (() -> Unit)? = null,
     replay: ReplayMedia? = null,
     player: ReplayPlayer? = null,
 ) {
@@ -81,5 +82,6 @@ fun ResultsRoute(
         },
         onRetry = { attempt++ },
         onBack = onBack,
+        onRecordAgain = onRecordAgain,
     )
 }

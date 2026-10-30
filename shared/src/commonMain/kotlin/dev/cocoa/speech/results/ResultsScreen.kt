@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -131,6 +132,7 @@ fun ResultsScreen(
     onSeek: (Double) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
+    onRecordAgain: (() -> Unit)? = null,
     replayPlayer: (@Composable () -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
@@ -138,7 +140,7 @@ fun ResultsScreen(
         when (state) {
             ResultsUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ExpressiveLoading() }
             ResultsUiState.Failed -> ResultsError(onRetry)
-            is ResultsUiState.Loaded -> ResultsContent(state.report, position, onSeek, replayPlayer)
+            is ResultsUiState.Loaded -> ResultsContent(state.report, grade, position, onSeek, onRecordAgain, replayPlayer)
         }
     }
 }
@@ -187,10 +189,12 @@ private fun BackChevron(label: String) {
 }
 
 @Composable
-private fun ResultsContent(
+private fun ColumnScope.ResultsContent(
     report: ResultsReport,
+    grade: String,
     position: () -> Double,
     onSeek: (Double) -> Unit,
+    onRecordAgain: (() -> Unit)?,
     replayPlayer: (@Composable () -> Unit)?,
 ) {
     val fixes = report.topFixes
@@ -230,6 +234,10 @@ private fun ResultsContent(
             if (page >= 0) scope.launch { pager.animateScrollToPage(page) }
         },
     )
+    if (report.events.isEmpty()) {
+        NoHands(grade, onRecordAgain, Modifier.weight(1f))
+        return
+    }
     // The stage, bubbles and cards scroll under the fixed scrubber; once scrolled, a short fade softens the edge.
     val scroll = rememberScrollState()
     val bg = MaterialTheme.colorScheme.background
